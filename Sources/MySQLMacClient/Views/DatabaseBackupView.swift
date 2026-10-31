@@ -138,6 +138,8 @@ struct DatabaseBackupView: View {
                     .font(.system(size: 12, design: .monospaced))
                     .foregroundStyle(theme.textSecondary)
                     .textSelection(.enabled)
+                Text("For an exact copy, use the built-in engine: \(toolURL.lastPathComponent) doesn't reproduce everything, such as dates that don't exist, -0 or an empty ENUM or SET member.")
+                    .foregroundStyle(theme.textSecondary)
                 if viewModel.externalToolRoundsFloats {
                     Text("\(toolURL.lastPathComponent) writes FLOAT values the way MariaDB prints them, to 6 significant digits, so this database's FLOAT columns can come back changed (16777216 as 16777200). The built-in engine keeps them exact.")
                         .foregroundStyle(.orange)
