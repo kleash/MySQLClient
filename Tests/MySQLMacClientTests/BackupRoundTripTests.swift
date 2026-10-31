@@ -118,6 +118,22 @@ final class BackupRoundTripTests: XCTestCase {
         XCTAssertLessThan(reads, 7_000, "700 rows")
     }
 
+    /// Structure only: every definition comes back, and no table's rows but
+    /// a sequence's one row, which holds its definition as well as where it
+    /// has got to.
+    func testStructureOnlyBackupRestoresEveryDefinition() async throws {
+        let before = try await fingerprint(of: database)
+        try await backUp { $0.mode = .structureOnly }
+        _ = try await service.rawQuery("DROP DATABASE `\(database)`")
+        try await restore()
+
+        // Without what's in each table, which structure only leaves out.
+        func structure(_ fingerprint: [String: String]) -> [String: String] {
+            fingerprint.filter { !($0.key.hasPrefix("table ") && ($0.key.hasSuffix(" checksum") || $0.key.hasSuffix(" rows"))) }
+        }
+        assertSame(structure(try await fingerprint(of: database)), structure(before))
+    }
+
     private func assertSame(_ actual: [String: String], _ expected: [String: String], file: StaticString = #filePath, line: UInt = #line) {
         for key in Set(expected.keys).union(actual.keys).sorted() {
             XCTAssertEqual(actual[key], expected[key], key, file: file, line: line)
@@ -211,14 +227,16 @@ final class BackupRoundTripTests: XCTestCase {
             // `COLLATE utf8mb4_unicode_ci`: the same thing, since a collation
             // names its character set, so only that spelling is evened out.
             // MariaDB names the sequence a DEFAULT takes numbers from with
-            // its database, which is another one in a copy.
-            result["table \(name)"] = try await showCreate("SHOW CREATE TABLE \(quoted)")
+            // its database, which is another one in a copy. A sequence's
+            // SHOW CREATE TABLE is the same for every one.
+            let kind = object.column("type")?.string == "SEQUENCE" ? "sequence" : "table"
+            result["\(kind) \(name)"] = try await showCreate("SHOW CREATE \(kind.uppercased()) \(quoted)")
                 .replacingOccurrences(of: #"CHARACTER SET (\w+) COLLATE (\1_\w+)"#, with: "COLLATE $2", options: .regularExpression)
                 .replacingOccurrences(of: "nextval(`\(database)`.", with: "nextval(")
             let checksum = try await service.rawQuery("CHECKSUM TABLE \(quoted)").rows.first
-            result["table \(name) checksum"] = checksum?.column("Checksum")?.string
+            result["\(kind) \(name) checksum"] = checksum?.column("Checksum")?.string
             let count = try await service.rawQuery("SELECT COUNT(*) AS n FROM \(quoted)").rows.first
-            result["table \(name) rows"] = count?.column("n")?.string
+            result["\(kind) \(name) rows"] = count?.column("n")?.string
         }
 
         let triggers = try await service.rawQuery("""

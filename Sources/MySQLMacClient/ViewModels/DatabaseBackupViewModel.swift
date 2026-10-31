@@ -609,7 +609,10 @@ final class DatabaseBackupViewModel: ObservableObject {
             let createSQL = SQLExporter.createTableStatement(rawShowCreateTable: rawDDL)
             fileHandle.write(Data((createSQL + "\n\n").utf8))
         }
-        if options.mode != .structureOnly {
+        // A sequence's definition (where it starts, its increment, cache)
+        // is in its one row, as well as where it has got to: SHOW CREATE
+        // TABLE gives every sequence the same CREATE TABLE.
+        if options.mode != .structureOnly || table.isSequence {
             try await dumpTableData(table, to: fileHandle)
         }
     }
