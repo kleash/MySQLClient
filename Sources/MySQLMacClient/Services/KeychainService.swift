@@ -16,11 +16,14 @@ enum KeychainError: Error, LocalizedError {
 /// Stores connection passwords in the macOS Keychain, keyed by the
 /// connection's UUID. Connection metadata (host/user/db/port/name) is
 /// persisted separately in `ConnectionStore` — never here, never in plaintext.
+/// `item` tells a connection's other secrets apart (`proxyPasswordItem`).
 struct KeychainService {
+    static let proxyPasswordItem = ".proxy"
+
     private let service = "com.mysqlmacclient.connection-password"
 
-    func savePassword(_ password: String, forConnectionId id: UUID) throws {
-        let account = id.uuidString
+    func savePassword(_ password: String, forConnectionId id: UUID, item: String = "") throws {
+        let account = id.uuidString + item
         let data = Data(password.utf8)
 
         let query: [String: Any] = [
@@ -40,11 +43,11 @@ struct KeychainService {
         }
     }
 
-    func readPassword(forConnectionId id: UUID) throws -> String? {
+    func readPassword(forConnectionId id: UUID, item: String = "") throws -> String? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
-            kSecAttrAccount as String: id.uuidString,
+            kSecAttrAccount as String: id.uuidString + item,
             kSecReturnData as String: true,
             kSecMatchLimit as String: kSecMatchLimitOne
         ]
@@ -63,11 +66,11 @@ struct KeychainService {
         }
     }
 
-    func deletePassword(forConnectionId id: UUID) throws {
+    func deletePassword(forConnectionId id: UUID, item: String = "") throws {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
-            kSecAttrAccount as String: id.uuidString
+            kSecAttrAccount as String: id.uuidString + item
         ]
         let status = SecItemDelete(query as CFDictionary)
         guard status == errSecSuccess || status == errSecItemNotFound else {

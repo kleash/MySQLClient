@@ -8,6 +8,8 @@ struct AppSession: Identifiable {
     let profile: ConnectionProfile
     let mysqlService: MySQLService
     let introspectionService: SchemaIntrospectionService
+    /// Set when the connection goes through an SSH server.
+    var tunnel: SSHTunnel?
 }
 
 @MainActor
@@ -18,5 +20,6 @@ final class AppState: ObservableObject {
         guard let session = activeSession else { return }
         activeSession = nil
         try? await session.mysqlService.disconnect()
+        session.tunnel?.close()
     }
 }

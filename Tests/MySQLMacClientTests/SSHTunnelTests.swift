@@ -115,6 +115,37 @@ final class SSHTunnelTests: XCTestCase {
         try await assertReachesThePrivateDatabase(service)
     }
 
+    /// The connection form opens the tunnel, logs in through it, and saves
+    /// the SSH and proxy settings with the connection.
+    @MainActor
+    func testConnectionFormConnectsThroughSSHAndTheProxy() async throws {
+        let store = ConnectionStore(fileURL: sshFolder.appendingPathComponent("connections.json"))
+        let form = ConnectionFormViewModel(connectionStore: store)
+        form.sshFolder = sshFolder
+        form.host = "private-mariadb"
+        form.port = "3306"
+        form.username = "root"
+        form.savePassword = false  // nothing to the Keychain
+        form.usesSSH = true
+        form.sshHost = behindProxy.host
+        form.sshPort = String(behindProxy.port)
+        form.sshUsername = behindProxy.username
+        form.sshKeyFile = behindProxy.keyFile
+        form.usesProxy = true
+        form.proxyHost = "127.0.0.1"
+        form.proxyPort = environment["MYSQL_TEST_PROXY_PORT"]!
+        form.proxyUsername = "proxyuser"
+        form.proxyPassword = "proxy-test-password"
+
+        let connected = await form.connect()
+        let session = try XCTUnwrap(connected, form.errorMessage ?? "")
+        tunnel = session.tunnel
+        service = session.mysqlService
+        let rows = try await session.mysqlService.textQuery("SELECT 1 + 1 AS two")
+        XCTAssertEqual(rows.first?.column("two")?.string, "2")
+        XCTAssertEqual(store.connections.first?.ssh, behindProxy)
+    }
+
     // MARK: - Pure
 
     func testArgumentsKeepTheHostFromBeingReadAsAnOption() {

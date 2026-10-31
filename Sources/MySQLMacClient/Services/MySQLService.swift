@@ -75,7 +75,7 @@ actor MySQLService {
     /// write, as `MySQLError.closed`. A single long-lived connection with no
     /// pooling (the MVP's explicit tradeoff) needs this to stay usable
     /// across a normal session instead of erroring on every idle gap.
-    private var lastCredentials: (host: String, port: Int, username: String, password: String?, database: String?, tls: TLSMode?)?
+    private var lastCredentials: (host: String, port: Int, username: String, password: String?, database: String?, tls: TLSMode?, serverName: String?)?
 
     private(set) var isConnected: Bool = false
 
@@ -96,7 +96,10 @@ actor MySQLService {
     /// `database: nil` connects with no default schema selected — MySQL
     /// allows this, and the caller is then expected to browse
     /// `SHOW DATABASES` and qualify every query as `` `db`.`table` ``.
-    func connect(host: String, port: Int, username: String, password: String?, database: String?, tls: TLSMode? = nil) async throws {
+    /// `serverName` is the server's own name for TLS when `host` isn't it
+    /// (an SSH tunnel's local end).
+    func connect(host: String, port: Int, username: String, password: String?, database: String?, tls: TLSMode? = nil,
+                 serverName: String? = nil) async throws {
         if connection != nil {
             try await disconnect()
         }
@@ -104,6 +107,7 @@ actor MySQLService {
         let group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
         let eventLoop = group.next()
         let address = try SocketAddress.makeAddressResolvingHost(host, port: port)
+        let tlsName = serverName ?? host
 
         do {
             // MySQLNIO's login waits forever if the connection closes before
@@ -121,7 +125,10 @@ actor MySQLService {
                 tlsConfiguration: tls.map(Self.tlsConfiguration),
                 // A host name for SNI and certificate checks; an IP address
                 // is checked against the certificate's addresses instead.
-                serverHostname: tls != nil && (try? SocketAddress(ipAddress: host, port: 0)) == nil ? host : nil,
+                // shortcut: through a tunnel that address is 127.0.0.1, so
+                // verifying a server known only by its IP fails (safely);
+                // fix with a custom verification callback if anyone needs it.
+                serverHostname: tls != nil && (try? SocketAddress(ipAddress: tlsName, port: 0)) == nil ? tlsName : nil,
                 on: eventLoop
             ).cascade(to: login)
             let conn = try await login.futureResult.always { _ in timeout.cancel() }.get()
@@ -138,7 +145,7 @@ actor MySQLService {
             self.eventLoopGroup = group
             self.connection = conn
             self.isConnected = true
-            self.lastCredentials = (host, port, username, password, database, tls)
+            self.lastCredentials = (host, port, username, password, database, tls, serverName)
             // Best-effort: a server that won't answer this is still a
             // perfectly usable connection, so a failure here is swallowed
             // rather than surfaced.
@@ -168,7 +175,8 @@ actor MySQLService {
             username: credentials.username,
             password: credentials.password,
             database: nil,
-            tls: credentials.tls
+            tls: credentials.tls,
+            serverName: credentials.serverName
         )
         await separate.disableAutomaticReconnect()
         return separate
@@ -313,7 +321,8 @@ actor MySQLService {
                 username: credentials.username,
                 password: credentials.password,
                 database: credentials.database,
-                tls: credentials.tls
+                tls: credentials.tls,
+                serverName: credentials.serverName
             )
             return try await operation()
         }

@@ -17,7 +17,7 @@ struct ConnectionFormView: View {
             savedConnectionsList
                 .frame(minWidth: 200, idealWidth: 220, maxWidth: 280)
 
-            form
+            ScrollView { form }
                 .frame(minWidth: 380, maxWidth: .infinity)
         }
         .frame(minWidth: 640, minHeight: 480)
@@ -163,6 +163,42 @@ struct ConnectionFormView: View {
                     .labelsHidden()
                     .fixedSize()
                 }
+                formRow("SSH") {
+                    Toggle("Connect through an SSH server", isOn: $viewModel.usesSSH)
+                        .toggleStyle(.checkbox)
+                }
+                if viewModel.usesSSH {
+                    formRow("SSH Host") {
+                        hostAndPort(host: $viewModel.sshHost, port: $viewModel.sshPort)
+                    }
+                    formRow("SSH Username") {
+                        TextField("", text: $viewModel.sshUsername)
+                            .visibleFieldBorder()
+                    }
+                    formRow("SSH Key") {
+                        HStack(spacing: 8) {
+                            TextField("Optional — ssh-agent and ~/.ssh if empty", text: $viewModel.sshKeyFile)
+                                .visibleFieldBorder()
+                            Button("Choose…", action: chooseKeyFile)
+                        }
+                    }
+                    formRow("HTTP Proxy") {
+                        Toggle("Reach the SSH server through an HTTP proxy", isOn: $viewModel.usesProxy)
+                            .toggleStyle(.checkbox)
+                    }
+                    if viewModel.usesProxy {
+                        formRow("Proxy Host") {
+                            hostAndPort(host: $viewModel.proxyHost, port: $viewModel.proxyPort)
+                        }
+                        formRow("Proxy Username") {
+                            TextField("Optional", text: $viewModel.proxyUsername)
+                                .visibleFieldBorder()
+                        }
+                        formRow("Proxy Password") {
+                            RevealablePasswordField(text: $viewModel.proxyPassword)
+                        }
+                    }
+                }
             }
             .padding(12)
             .background(RoundedRectangle(cornerRadius: 6).fill(Color(nsColor: .textBackgroundColor)))
@@ -208,6 +244,26 @@ struct ConnectionFormView: View {
         }
         .padding(32)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    }
+
+    private func hostAndPort(host: Binding<String>, port: Binding<String>) -> some View {
+        HStack(spacing: 8) {
+            TextField("", text: host)
+                .visibleFieldBorder()
+            Text("Port")
+            TextField("", text: port)
+                .visibleFieldBorder()
+                .frame(width: 64)
+        }
+    }
+
+    private func chooseKeyFile() {
+        let panel = NSOpenPanel()
+        panel.showsHiddenFiles = true
+        panel.directoryURL = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".ssh")
+        if panel.runModal() == .OK, let url = panel.url {
+            viewModel.sshKeyFile = url.path
+        }
     }
 
     /// One `Grid` row: right-aligned label in the shared label column,

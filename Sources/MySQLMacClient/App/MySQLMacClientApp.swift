@@ -7,6 +7,14 @@ import AppKit
 /// draws and takes clicks, but keyboard focus stays with whatever app was
 /// frontmost before launch (e.g. the IDE) and every keystroke leaks there.
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    /// Set by the app, so quitting can end an SSH tunnel's ssh, which
+    /// would otherwise outlive the app.
+    weak var appState: AppState?
+
+    func applicationWillTerminate(_ notification: Notification) {
+        appState?.activeSession?.tunnel?.close()
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Bundle check keeps this a no-op for the .app builds while
         // restoring keyboard input for `swift run` development builds.
@@ -66,6 +74,7 @@ struct MySQLMacClientApp: App {
                 }
             }
             .frame(minWidth: 800, minHeight: 560)
+            .onAppear { appDelegate.appState = appState }
             .environmentObject(appearanceStore)
             .environmentObject(settingsStore)
             .preferredColorScheme(appearanceStore.mode.colorScheme)

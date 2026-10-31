@@ -12,6 +12,24 @@ final class ConnectionFormViewModel: ObservableObject {
     @Published var note: String = ""
     @Published var tlsMode: TLSMode?
 
+    /// Through an SSH server: Host and Port are then the database as that
+    /// server sees it.
+    @Published var usesSSH = false
+    @Published var sshHost = ""
+    @Published var sshPort = "22"
+    @Published var sshUsername = ""
+    /// Empty: the keys ssh finds by itself.
+    @Published var sshKeyFile = ""
+    /// The SSH server reached through an HTTP proxy.
+    @Published var usesProxy = false
+    @Published var proxyHost = ""
+    @Published var proxyPort = "8080"
+    @Published var proxyUsername = ""
+    @Published var proxyPassword = ""
+    /// The folder ssh keeps its config, known hosts and keys in; nil for
+    /// its own (~/.ssh).
+    var sshFolder: URL?
+
     @Published private(set) var isConnecting = false
     @Published var errorMessage: String?
 
@@ -40,15 +58,38 @@ final class ConnectionFormViewModel: ObservableObject {
         database = profile.database ?? ""
         note = profile.note ?? ""
         tlsMode = profile.tlsMode
+        usesSSH = profile.ssh != nil
+        sshHost = profile.ssh?.host ?? ""
+        sshPort = String(profile.ssh?.port ?? 22)
+        sshUsername = profile.ssh?.username ?? ""
+        sshKeyFile = profile.ssh?.keyFile ?? ""
+        usesProxy = profile.ssh?.proxy != nil
+        proxyHost = profile.ssh?.proxy?.host ?? ""
+        proxyPort = String(profile.ssh?.proxy?.port ?? 8080)
+        proxyUsername = profile.ssh?.proxy?.username ?? ""
         errorMessage = nil
 
         let storedPassword = (try? keychainService.readPassword(forConnectionId: profile.id)) ?? nil
         password = storedPassword ?? ""
         savePassword = storedPassword != nil
+        proxyPassword = ((try? keychainService.readPassword(forConnectionId: profile.id, item: KeychainService.proxyPasswordItem)) ?? nil) ?? ""
     }
 
     var canSubmit: Bool {
         !host.isEmpty && !username.isEmpty && Int(port) != nil && !isConnecting
+            && (!usesSSH || !sshHost.isEmpty && Int(sshPort) != nil)
+            && (!usesSSH || !usesProxy || !proxyHost.isEmpty && Int(proxyPort) != nil)
+    }
+
+    /// The SSH settings the form describes, nil without SSH.
+    private var sshSettings: SSHSettings? {
+        guard usesSSH, let sshPortNumber = Int(sshPort) else { return nil }
+        let proxy = usesProxy ? Int(proxyPort).map {
+            HTTPProxySettings(host: proxyHost.trimmingCharacters(in: .whitespaces), port: $0,
+                              username: proxyUsername.trimmingCharacters(in: .whitespaces))
+        } : nil
+        return SSHSettings(host: sshHost.trimmingCharacters(in: .whitespaces), port: sshPortNumber,
+                           username: sshUsername.trimmingCharacters(in: .whitespaces), keyFile: sshKeyFile, proxy: proxy)
     }
 
     func connect() async -> AppSession? {
@@ -62,17 +103,32 @@ final class ConnectionFormViewModel: ObservableObject {
         defer { isConnecting = false }
 
         let trimmedDatabase = database.trimmingCharacters(in: .whitespaces)
+        let ssh = sshSettings
         let service = MySQLService()
+        var tunnel: SSHTunnel?
         do {
+            var connectHost = host
+            var connectPort = portNumber
+            if let ssh {
+                let proxy = ssh.proxy.map {
+                    HTTPProxyConnector.Proxy(host: $0.host, port: $0.port, username: $0.username, password: proxyPassword)
+                }
+                let opened = SSHTunnel(settings: ssh, proxy: proxy, sshFolder: sshFolder)
+                tunnel = opened
+                connectPort = try await opened.open(to: host, port: portNumber)
+                connectHost = "127.0.0.1"
+            }
             try await service.connect(
-                host: host,
-                port: portNumber,
+                host: connectHost,
+                port: connectPort,
                 username: username,
                 password: password.isEmpty ? nil : password,
                 database: trimmedDatabase.isEmpty ? nil : trimmedDatabase,
-                tls: tlsMode
+                tls: tlsMode,
+                serverName: ssh != nil ? host : nil
             )
         } catch {
+            tunnel?.close()
             errorMessage = String(localized: "Could not connect: \(error.localizedDescription)")
             return nil
         }
@@ -86,12 +142,19 @@ final class ConnectionFormViewModel: ObservableObject {
             username: username,
             database: trimmedDatabase.isEmpty ? nil : trimmedDatabase,
             note: trimmedNote.isEmpty ? nil : trimmedNote,
-            tlsMode: tlsMode
+            tlsMode: tlsMode,
+            ssh: ssh
         )
         if savePassword {
             try? keychainService.savePassword(password, forConnectionId: profile.id)
         } else if editingProfileId != nil {
             try? keychainService.deletePassword(forConnectionId: profile.id)
+        }
+        // The proxy's password goes with the database's: saved or not.
+        if savePassword, ssh?.proxy != nil, !proxyPassword.isEmpty {
+            try? keychainService.savePassword(proxyPassword, forConnectionId: profile.id, item: KeychainService.proxyPasswordItem)
+        } else if editingProfileId != nil {
+            try? keychainService.deletePassword(forConnectionId: profile.id, item: KeychainService.proxyPasswordItem)
         }
         if editingProfileId != nil {
             connectionStore.update(profile)
@@ -103,7 +166,8 @@ final class ConnectionFormViewModel: ObservableObject {
         return AppSession(
             profile: profile,
             mysqlService: service,
-            introspectionService: SchemaIntrospectionService(service: service)
+            introspectionService: SchemaIntrospectionService(service: service),
+            tunnel: tunnel
         )
     }
 
@@ -113,5 +177,6 @@ final class ConnectionFormViewModel: ObservableObject {
     func delete(_ profile: ConnectionProfile) {
         connectionStore.remove(profile)
         try? keychainService.deletePassword(forConnectionId: profile.id)
+        try? keychainService.deletePassword(forConnectionId: profile.id, item: KeychainService.proxyPasswordItem)
     }
 }
