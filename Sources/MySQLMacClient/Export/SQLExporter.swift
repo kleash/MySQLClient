@@ -141,28 +141,32 @@ enum SQLExporter {
     }
 
     // MARK: - Database Backup
+    //
+    // A backup names its objects without their database, like its CREATE
+    // statements, so the file restores into whichever database is current:
+    // the one its own USE picks, or another one when that's left out.
 
-    static func dropTableStatement(database: String, table: String) -> String {
-        "DROP TABLE IF EXISTS \(quoted(database)).\(quoted(table));"
+    static func dropTableStatement(table: String) -> String {
+        "DROP TABLE IF EXISTS \(quoted(table));"
     }
 
-    static func dropViewStatement(database: String, view: String) -> String {
-        "DROP VIEW IF EXISTS \(quoted(database)).\(quoted(view));"
+    static func dropViewStatement(view: String) -> String {
+        "DROP VIEW IF EXISTS \(quoted(view));"
     }
 
     /// Works for both procedures and functions via `RoutineInfo.kind
     /// .sqlKeyword` — same "one type instead of two" principle
     /// `RoutineKind`'s own doc comment describes.
     static func dropRoutineStatement(_ routine: RoutineInfo) -> String {
-        "DROP \(routine.kind.sqlKeyword) IF EXISTS \(quoted(routine.database)).\(quoted(routine.name));"
+        "DROP \(routine.kind.sqlKeyword) IF EXISTS \(quoted(routine.name));"
     }
 
     static func dropTriggerStatement(_ trigger: TriggerInfo) -> String {
-        "DROP TRIGGER IF EXISTS \(quoted(trigger.database)).\(quoted(trigger.name));"
+        "DROP TRIGGER IF EXISTS \(quoted(trigger.name));"
     }
 
     static func dropEventStatement(_ event: EventInfo) -> String {
-        "DROP EVENT IF EXISTS \(quoted(event.database)).\(quoted(event.name));"
+        "DROP EVENT IF EXISTS \(quoted(event.name));"
     }
 
     /// Wraps a routine's raw `SHOW CREATE <kind>` output (from
@@ -198,25 +202,9 @@ enum SQLExporter {
     /// cap. A single row that alone exceeds the byte budget is still
     /// emitted alone rather than looping forever trying to make it fit —
     /// forward progress is guaranteed either way.
-    static func extendedInsertStatements(
-        database: String,
-        table: String,
-        columns: [ColumnInfo],
-        rows: [[RowValue]],
-        maxRowsPerStatement: Int = 500,
-        maxStatementByteBudget: Int = 512_000
-    ) -> [String] {
-        insertStatements(
-            into: "\(quoted(database)).\(quoted(table))",
-            columnNames: columns.map(\.name),
-            literalRows: rows.map { $0.map(sqlLiteral) },
-            maxRowsPerStatement: maxRowsPerStatement,
-            maxStatementByteBudget: maxStatementByteBudget
-        )
-    }
-
-    /// `extendedInsertStatements` for rows whose values are already SQL
-    /// literals. `maxRowsPerStatement: 1` gives one INSERT per row.
+    ///
+    /// Takes rows whose values are already SQL literals.
+    /// `maxRowsPerStatement: 1` gives one INSERT per row.
     static func insertStatements(
         into qualifiedTable: String,
         columnNames: [String],

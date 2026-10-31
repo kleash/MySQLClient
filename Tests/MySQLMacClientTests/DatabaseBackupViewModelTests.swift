@@ -170,7 +170,7 @@ final class DatabaseBackupViewModelTests: XCTestCase {
         XCTAssertNil(viewModel.errorMessage)
         let contents = try String(contentsOf: tempFileURL, encoding: .utf8)
         XCTAssertTrue(contents.contains("CREATE TABLE IF NOT EXISTS `widgets`"))
-        XCTAssertTrue(contents.contains("INSERT INTO `mysqlmacclient_test`.`widgets`"))
+        XCTAssertTrue(contents.contains("INSERT INTO `widgets`"))
         XCTAssertTrue(contents.contains("CREATE OR REPLACE"))
         XCTAssertTrue(contents.contains("VIEW `widget_view`"))
         XCTAssertTrue(viewModel.didFinishSuccessfully, "başarılı bir yedekleme tamamlanma uyarısını tetiklemeli")
@@ -263,8 +263,8 @@ final class DatabaseBackupViewModelTests: XCTestCase {
 
         XCTAssertNil(viewModel.errorMessage)
         let contents = try String(contentsOf: tempFileURL, encoding: .utf8)
-        XCTAssertTrue(contents.contains("DROP TABLE IF EXISTS `mysqlmacclient_test`.`widgets`;"))
-        XCTAssertTrue(contents.contains("DROP VIEW IF EXISTS `mysqlmacclient_test`.`widget_view`;"))
+        XCTAssertTrue(contents.contains("DROP TABLE IF EXISTS `widgets`;"))
+        XCTAssertTrue(contents.contains("DROP VIEW IF EXISTS `widget_view`;"))
     }
 
     func testRunBackupWithDropStatementsOptionEmitsDropForRoutinesWhenAvailable() async throws {
@@ -282,8 +282,8 @@ final class DatabaseBackupViewModelTests: XCTestCase {
 
         XCTAssertNil(viewModel.errorMessage)
         let contents = try String(contentsOf: tempFileURL, encoding: .utf8)
-        XCTAssertTrue(contents.contains("DROP PROCEDURE IF EXISTS `mysqlmacclient_test`.`backup_test_proc`;"))
-        XCTAssertTrue(contents.contains("DROP FUNCTION IF EXISTS `mysqlmacclient_test`.`backup_test_fn`;"))
+        XCTAssertTrue(contents.contains("DROP PROCEDURE IF EXISTS `backup_test_proc`;"))
+        XCTAssertTrue(contents.contains("DROP FUNCTION IF EXISTS `backup_test_fn`;"))
     }
 
     func testForeignKeyChecksOptionEmitsBothSetStatementsWhenEnabled() async throws {

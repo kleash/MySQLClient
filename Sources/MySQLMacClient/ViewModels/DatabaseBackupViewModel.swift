@@ -550,7 +550,7 @@ final class DatabaseBackupViewModel: ObservableObject {
     private func dumpTable(_ table: TableInfo, to fileHandle: FileHandle) async throws {
         if options.mode != .dataOnly {
             if options.file.includeDropStatements {
-                fileHandle.write(Data((SQLExporter.dropTableStatement(database: database.name, table: table.name) + "\n").utf8))
+                fileHandle.write(Data((SQLExporter.dropTableStatement(table: table.name) + "\n").utf8))
             }
             let rawDDL = try await introspection.showCreateTable(table.name, inDatabase: database.name)
             let createSQL = SQLExporter.createTableStatement(rawShowCreateTable: rawDDL)
@@ -654,7 +654,7 @@ final class DatabaseBackupViewModel: ObservableObject {
             }
 
             let statements = SQLExporter.insertStatements(
-                into: qualifiedTable,
+                into: SQLExporter.quoted(table.name),
                 columnNames: columns.map(\.name),
                 literalRows: rows,
                 maxRowsPerStatement: options.file.useExtendedInserts ? 500 : 1
@@ -709,7 +709,7 @@ final class DatabaseBackupViewModel: ObservableObject {
     private func dumpView(_ view: TableInfo, to fileHandle: FileHandle) async throws {
         guard options.mode != .dataOnly else { return }
         if options.file.includeDropStatements {
-            fileHandle.write(Data((SQLExporter.dropViewStatement(database: database.name, view: view.name) + "\n").utf8))
+            fileHandle.write(Data((SQLExporter.dropViewStatement(view: view.name) + "\n").utf8))
         }
         let rawDDL = try await introspection.showCreateView(view.name, inDatabase: database.name)
         let createSQL = SQLExporter.createViewStatement(rawShowCreateView: rawDDL)

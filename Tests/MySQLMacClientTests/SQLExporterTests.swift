@@ -68,19 +68,19 @@ final class SQLExporterTests: XCTestCase {
     // MARK: - Database Backup
 
     func testDropTableStatementEmitsDropIfExists() {
-        XCTAssertEqual(SQLExporter.dropTableStatement(database: "testdb", table: "widgets"), "DROP TABLE IF EXISTS `testdb`.`widgets`;")
+        XCTAssertEqual(SQLExporter.dropTableStatement(table: "widgets"), "DROP TABLE IF EXISTS `widgets`;")
     }
 
     func testDropViewStatementEmitsDropIfExists() {
-        XCTAssertEqual(SQLExporter.dropViewStatement(database: "testdb", view: "widget_view"), "DROP VIEW IF EXISTS `testdb`.`widget_view`;")
+        XCTAssertEqual(SQLExporter.dropViewStatement(view: "widget_view"), "DROP VIEW IF EXISTS `widget_view`;")
     }
 
     func testDropRoutineStatementUsesTheRoutinesSQLKeyword() {
         let procedure = RoutineInfo(database: "testdb", name: "doStuff", kind: .procedure)
-        XCTAssertEqual(SQLExporter.dropRoutineStatement(procedure), "DROP PROCEDURE IF EXISTS `testdb`.`doStuff`;")
+        XCTAssertEqual(SQLExporter.dropRoutineStatement(procedure), "DROP PROCEDURE IF EXISTS `doStuff`;")
 
         let function = RoutineInfo(database: "testdb", name: "computeStuff", kind: .function)
-        XCTAssertEqual(SQLExporter.dropRoutineStatement(function), "DROP FUNCTION IF EXISTS `testdb`.`computeStuff`;")
+        XCTAssertEqual(SQLExporter.dropRoutineStatement(function), "DROP FUNCTION IF EXISTS `computeStuff`;")
     }
 
     func testDelimiterWrappedRoutineStatementWrapsBodyInDelimiterDollarDollar() {
@@ -89,58 +89,58 @@ final class SQLExporterTests: XCTestCase {
         XCTAssertEqual(result, "DELIMITER $$\n\nCREATE PROCEDURE `testdb`.`doStuff`()\nBEGIN\n  SELECT 1;\nEND$$\n\nDELIMITER ;")
     }
 
-    func testExtendedInsertStatementsProducesOneStatementWhenUnderBothCaps() {
-        let rows: [[RowValue]] = [[.int(1), .string("Bolt")], [.int(2), .string("Nut")], [.int(3), .string("Washer")]]
-        let statements = SQLExporter.extendedInsertStatements(database: "testdb", table: "widgets", columns: Array(columns.prefix(2)), rows: rows)
+    func testInsertStatementsProducesOneStatementWhenUnderBothCaps() {
+        let rows = [["1", "'Bolt'"], ["2", "'Nut'"], ["3", "'Washer'"]]
+        let statements = SQLExporter.insertStatements(into: "`widgets`", columnNames: ["id", "name"], literalRows: rows)
         XCTAssertEqual(statements.count, 1)
         XCTAssertEqual(
             statements.first,
-            "INSERT INTO `testdb`.`widgets` (`id`, `name`) VALUES (1, 'Bolt'), (2, 'Nut'), (3, 'Washer');"
+            "INSERT INTO `widgets` (`id`, `name`) VALUES (1, 'Bolt'), (2, 'Nut'), (3, 'Washer');"
         )
     }
 
-    func testExtendedInsertStatementsSplitsWhenRowCountCapExceeded() {
-        let rows: [[RowValue]] = (1...5).map { [.int($0)] }
-        let statements = SQLExporter.extendedInsertStatements(
-            database: "testdb", table: "widgets", columns: [columns[0]], rows: rows,
+    func testInsertStatementsSplitsWhenRowCountCapExceeded() {
+        let rows = (1...5).map { [String($0)] }
+        let statements = SQLExporter.insertStatements(
+            into: "`widgets`", columnNames: ["id"], literalRows: rows,
             maxRowsPerStatement: 2
         )
         XCTAssertEqual(statements.count, 3)
-        XCTAssertEqual(statements[0], "INSERT INTO `testdb`.`widgets` (`id`) VALUES (1), (2);")
-        XCTAssertEqual(statements[1], "INSERT INTO `testdb`.`widgets` (`id`) VALUES (3), (4);")
-        XCTAssertEqual(statements[2], "INSERT INTO `testdb`.`widgets` (`id`) VALUES (5);")
+        XCTAssertEqual(statements[0], "INSERT INTO `widgets` (`id`) VALUES (1), (2);")
+        XCTAssertEqual(statements[1], "INSERT INTO `widgets` (`id`) VALUES (3), (4);")
+        XCTAssertEqual(statements[2], "INSERT INTO `widgets` (`id`) VALUES (5);")
     }
 
-    func testExtendedInsertStatementsSplitsWhenByteBudgetExceeded() {
+    func testInsertStatementsSplitsWhenByteBudgetExceeded() {
         // Each tuple "(1)" etc. is 3 bytes; a budget far smaller than two
         // tuples plus the "INSERT INTO ... VALUES " prefix forces a split
         // after every single row even though the row cap is never hit.
-        let rows: [[RowValue]] = (1...3).map { [.int($0)] }
-        let prefixLength = "INSERT INTO `testdb`.`widgets` (`id`) VALUES ".utf8.count
-        let statements = SQLExporter.extendedInsertStatements(
-            database: "testdb", table: "widgets", columns: [columns[0]], rows: rows,
+        let rows = (1...3).map { [String($0)] }
+        let prefixLength = "INSERT INTO `widgets` (`id`) VALUES ".utf8.count
+        let statements = SQLExporter.insertStatements(
+            into: "`widgets`", columnNames: ["id"], literalRows: rows,
             maxStatementByteBudget: prefixLength + 3
         )
         XCTAssertEqual(statements.count, 3)
-        XCTAssertEqual(statements[0], "INSERT INTO `testdb`.`widgets` (`id`) VALUES (1);")
-        XCTAssertEqual(statements[1], "INSERT INTO `testdb`.`widgets` (`id`) VALUES (2);")
-        XCTAssertEqual(statements[2], "INSERT INTO `testdb`.`widgets` (`id`) VALUES (3);")
+        XCTAssertEqual(statements[0], "INSERT INTO `widgets` (`id`) VALUES (1);")
+        XCTAssertEqual(statements[1], "INSERT INTO `widgets` (`id`) VALUES (2);")
+        XCTAssertEqual(statements[2], "INSERT INTO `widgets` (`id`) VALUES (3);")
     }
 
     /// A single row whose own tuple already exceeds the byte budget must
     /// still be emitted alone — never dropped, never looped on forever.
-    func testExtendedInsertStatementsAlwaysEmitsASingleOversizedRowAlone() {
+    func testInsertStatementsAlwaysEmitsASingleOversizedRowAlone() {
         let longName = String(repeating: "x", count: 1000)
-        let rows: [[RowValue]] = [[.int(1), .string(longName)]]
-        let statements = SQLExporter.extendedInsertStatements(
-            database: "testdb", table: "widgets", columns: Array(columns.prefix(2)), rows: rows,
+        let rows = [["1", "'\(longName)'"]]
+        let statements = SQLExporter.insertStatements(
+            into: "`widgets`", columnNames: ["id", "name"], literalRows: rows,
             maxStatementByteBudget: 10
         )
         XCTAssertEqual(statements.count, 1)
         XCTAssertTrue(statements[0].contains(longName))
     }
 
-    func testExtendedInsertStatementsWithNoRowsReturnsEmptyArray() {
-        XCTAssertEqual(SQLExporter.extendedInsertStatements(database: "testdb", table: "widgets", columns: columns, rows: []), [])
+    func testInsertStatementsWithNoRowsReturnsEmptyArray() {
+        XCTAssertEqual(SQLExporter.insertStatements(into: "`widgets`", columnNames: ["id"], literalRows: []), [])
     }
 }

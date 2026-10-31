@@ -19,6 +19,7 @@ import XCTest
 @MainActor
 final class BackupRoundTripTests: XCTestCase {
     private let database = "mysqlmacclient_roundtrip"
+    private let copy = "mysqlmacclient_roundtrip_copy"
     private var service: MySQLService!
     private var dumpURL: URL!
 
@@ -42,11 +43,12 @@ final class BackupRoundTripTests: XCTestCase {
     override func tearDown() async throws {
         try? FileManager.default.removeItem(at: dumpURL)
         _ = try? await service.rawQuery("DROP DATABASE IF EXISTS `\(database)`")
+        _ = try? await service.rawQuery("DROP DATABASE IF EXISTS `\(copy)`")
         try await service.disconnect()
     }
 
     func testBackupRestoresEveryObjectAndRowExactly() async throws {
-        let before = try await fingerprint()
+        let before = try await fingerprint(of: database)
         // Reading in another time zone and with ANSI_QUOTES must not change
         // what the file says.
         _ = try await service.rawQuery("SET SESSION time_zone = '-08:00', sql_mode = 'ANSI_QUOTES'")
@@ -59,9 +61,32 @@ final class BackupRoundTripTests: XCTestCase {
         _ = try await service.rawQuery("DROP DATABASE `\(database)`")
         try await restore()
 
-        let after = try await fingerprint()
-        for key in Set(before.keys).union(after.keys).sorted() {
-            XCTAssertEqual(after[key], before[key], key)
+        assertSame(try await fingerprint(of: database), before)
+    }
+
+    /// Without its CREATE DATABASE and USE, a backup restores into whichever
+    /// database is current — here one next to the original, which must
+    /// come out the same and leave the original untouched.
+    func testBackupRestoresIntoAnotherDatabase() async throws {
+        let before = try await fingerprint(of: database)
+        try await backUp {
+            $0.file.includeCreateDatabaseStatement = false
+            $0.file.includeUseStatement = false
+        }
+        _ = try await service.rawQuery("CREATE DATABASE `\(copy)` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci")
+        try await restore(into: copy)
+
+        assertSame(try await fingerprint(of: database), before)
+        var restored = try await fingerprint(of: copy)
+        var original = before
+        restored["database"] = nil
+        original["database"] = nil
+        assertSame(restored, original)
+    }
+
+    private func assertSame(_ actual: [String: String], _ expected: [String: String], file: StaticString = #filePath, line: UInt = #line) {
+        for key in Set(expected.keys).union(actual.keys).sorted() {
+            XCTAssertEqual(actual[key], expected[key], key, file: file, line: line)
         }
     }
 
@@ -79,11 +104,13 @@ final class BackupRoundTripTests: XCTestCase {
         return service
     }
 
-    /// Everything selected, default options except a tiny page size, so
-    /// every table with more than a few rows is read across pages.
-    private func backUp() async throws {
+    /// Everything selected, default options (unless `configure` changes
+    /// them) and a tiny page size, so every table with more than a few rows
+    /// is read across pages.
+    private func backUp(configure: (inout DatabaseBackupOptions) -> Void = { _ in }) async throws {
         let viewModel = DatabaseBackupViewModel(service: service, database: DatabaseInfo(name: database))
         await viewModel.loadDatabasesAndObjects()
+        configure(&viewModel.options)
         viewModel.dataPageSize = 7
         viewModel.outputFileURL = dumpURL
         viewModel.outputLocationIsGranted = true
@@ -94,10 +121,14 @@ final class BackupRoundTripTests: XCTestCase {
     }
 
     /// Replays the file statement by statement the way the `mysql` client
-    /// would, on a separate connection set up unlike the source server.
-    private func restore() async throws {
+    /// would, on a separate connection set up unlike the source server,
+    /// with `database` (when given) as its current database.
+    private func restore(into database: String? = nil) async throws {
         let target = try await connect()
         defer { Task { try? await target.disconnect() } }
+        if let database {
+            _ = try await target.rawQuery("USE `\(database)`")
+        }
         _ = try await target.rawQuery("SET SESSION time_zone = '+05:30'")
         _ = try await target.rawQuery("SET SESSION sql_mode = 'NO_BACKSLASH_ESCAPES,STRICT_ALL_TABLES,NO_ZERO_DATE,NO_ZERO_IN_DATE'")
         _ = try await target.rawQuery("SET NAMES latin1")
@@ -119,7 +150,7 @@ final class BackupRoundTripTests: XCTestCase {
     /// What the server reports about every object in the database, keyed
     /// by a readable name so a failure says which object and which aspect
     /// differ.
-    private func fingerprint() async throws -> [String: String] {
+    private func fingerprint(of database: String) async throws -> [String: String] {
         // `SHOW CREATE VIEW` qualifies names unless the view's database is
         // the current one, and dropping a database leaves none current.
         _ = try await service.rawQuery("USE `\(database)`")
