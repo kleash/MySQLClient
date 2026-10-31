@@ -16,7 +16,10 @@ enum DatabaseBackupMode: String, CaseIterable, Identifiable {
 }
 
 /// "KAYNAĞI ETKİLEYEN SEÇENEKLER" — how the live source database is read
-/// during the dump. Both false by default, matching the reference dialog.
+/// during the dump. A single transaction by default: without it, a backup
+/// of a database in use reads each table at a different moment and can
+/// hold rows that never existed together (an order without its items).
+/// It doesn't block writers the way `lockTablesForReading` does.
 ///
 /// Deliberately just these two: a third checkbox in the reference image
 /// ("Dump öncesi logları temizle") mapped to `RESET MASTER` in real MySQL —
@@ -26,7 +29,7 @@ enum DatabaseBackupMode: String, CaseIterable, Identifiable {
 /// promises.
 struct DatabaseBackupSourceOptions: Equatable {
     var lockTablesForReading = false
-    var useSingleTransaction = false
+    var useSingleTransaction = true
 }
 
 /// "DOSYAYA YAZILAN SEÇENEKLER" — what ends up written into the generated

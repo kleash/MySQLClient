@@ -70,6 +70,12 @@ actor MySQLService {
 
     private(set) var isConnected: Bool = false
 
+    /// How many connections this service has opened, silent reconnects
+    /// included. A caller that depends on its session staying the same
+    /// (a backup's snapshot and settings) compares it to notice the session
+    /// was replaced underneath it.
+    private(set) var connectionCount = 0
+
     /// Whatever `SELECT VERSION()` returned on connect — e.g.
     /// `"10.4.32-MariaDB"` or `"8.0.45"`. Read once per connection rather
     /// than per use: it can't change under a live connection, and error
@@ -113,6 +119,7 @@ actor MySQLService {
             self.eventLoopGroup = group
             self.connection = conn
             self.isConnected = true
+            self.connectionCount += 1
             self.lastCredentials = (host, port, username, password, database)
             // Best-effort: a server that won't answer this is still a
             // perfectly usable connection, so a failure here is swallowed

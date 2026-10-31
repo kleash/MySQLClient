@@ -30,6 +30,14 @@ final class DatabaseBackupViewModel: ObservableObject {
         }
     }
 
+    enum BackupError: LocalizedError {
+        case connectionReplaced
+
+        var errorDescription: String? {
+            String(localized: "The connection to the server dropped during the backup. The rest would have been read outside the backup's snapshot and settings, so nothing was saved. Run the backup again.")
+        }
+    }
+
     private enum BackupObject {
         case table(TableInfo)
         case view(TableInfo)
@@ -145,6 +153,8 @@ final class DatabaseBackupViewModel: ObservableObject {
     private var unitsBeforeCurrentObject = 0
     private var savedSessionSettings: (timeZone: String, sqlMode: String)?
     private var wroteViewStandIns = false
+    /// `MySQLService.connectionCount` when the backup's session began.
+    private var sessionConnectionCount = 0
 
     init(service: MySQLService, database: DatabaseInfo) {
         self.service = service
@@ -354,6 +364,7 @@ final class DatabaseBackupViewModel: ObservableObject {
                             currentObjectDescription: object.description
                         )
                         try await self.dump(object, to: fileHandle)
+                        try await self.ensureSameSession()
                         self.unitsBeforeCurrentObject += weights[index]
                         if self.interObjectDelay != .zero {
                             try await Task.sleep(for: self.interObjectDelay)
@@ -454,6 +465,7 @@ final class DatabaseBackupViewModel: ObservableObject {
     /// shared with the rest of the app, so `endSourceSession` puts the
     /// session's own settings back.
     private func beginSourceSession() async throws {
+        sessionConnectionCount = await service.connectionCount
         let current = try await service.textQuery("SELECT @@SESSION.time_zone AS time_zone, @@SESSION.sql_mode AS sql_mode").first
         savedSessionSettings = (
             timeZone: current?.column("time_zone")?.string ?? "SYSTEM",
@@ -482,6 +494,16 @@ final class DatabaseBackupViewModel: ObservableObject {
                 SET SESSION time_zone = '\(SQLExporter.escapeStringLiteral(saved.timeZone))', \
                 sql_mode = '\(SQLExporter.escapeStringLiteral(saved.sqlMode))'
                 """)
+        }
+    }
+
+    /// Throws once the connection has been silently reopened
+    /// (`MySQLService` does that after a drop): whatever was read since came
+    /// from a new session, without the snapshot and settings
+    /// `beginSourceSession` set up, so the file can't be trusted.
+    private func ensureSameSession() async throws {
+        guard await service.connectionCount == sessionConnectionCount else {
+            throw BackupError.connectionReplaced
         }
     }
 

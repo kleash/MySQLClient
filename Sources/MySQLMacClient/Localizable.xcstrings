@@ -32614,6 +32614,113 @@
         }
       }
     },
+    "The connection to the server dropped during the backup. The rest would have been read outside the backup's snapshot and settings, so nothing was saved. Run the backup again.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "انقطع الاتصال بالخادم أثناء النسخ الاحتياطي. كان الباقي سيُقرأ خارج اللقطة والإعدادات الخاصة بالنسخ الاحتياطي، لذلك لم يُحفظ شيء. شغّل النسخ الاحتياطي مرة أخرى."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Verbindung zum Server ist während der Sicherung abgebrochen. Der Rest wäre außerhalb des Snapshots und der Einstellungen der Sicherung gelesen worden, daher wurde nichts gespeichert. Starten Sie die Sicherung erneut."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La conexión con el servidor se cortó durante la copia de seguridad. El resto se habría leído fuera de la instantánea y la configuración de la copia, así que no se guardó nada. Vuelve a ejecutar la copia de seguridad."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La connexion au serveur a été interrompue pendant la sauvegarde. Le reste aurait été lu hors de l'instantané et des réglages de la sauvegarde, donc rien n'a été enregistré. Relancez la sauvegarde."
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "बैकअप के दौरान सर्वर से कनेक्शन टूट गया। बाकी हिस्सा बैकअप के स्नैपशॉट और सेटिंग्स के बाहर पढ़ा जाता, इसलिए कुछ भी सेव नहीं किया गया। बैकअप फिर से चलाएँ।"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Koneksi ke server terputus saat pencadangan. Sisanya akan terbaca di luar snapshot dan pengaturan pencadangan, jadi tidak ada yang disimpan. Jalankan pencadangan lagi."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La connessione al server si è interrotta durante il backup. Il resto sarebbe stato letto fuori dallo snapshot e dalle impostazioni del backup, quindi non è stato salvato nulla. Esegui di nuovo il backup."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "バックアップ中にサーバーとの接続が切れました。残りはバックアップのスナップショットと設定の外で読み込まれることになるため、何も保存しませんでした。もう一度バックアップを実行してください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "백업 중에 서버 연결이 끊어졌습니다. 나머지는 백업의 스냅샷과 설정 밖에서 읽혔을 것이므로 아무것도 저장하지 않았습니다. 백업을 다시 실행하세요."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Połączenie z serwerem zostało przerwane podczas kopii zapasowej. Reszta zostałaby odczytana poza migawką i ustawieniami kopii, więc niczego nie zapisano. Uruchom kopię zapasową ponownie."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A conexão com o servidor caiu durante o backup. O restante seria lido fora do snapshot e das configurações do backup, então nada foi salvo. Execute o backup novamente."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Соединение с сервером прервалось во время резервного копирования. Остальное было бы прочитано вне снимка и настроек резервной копии, поэтому ничего не сохранено. Запустите резервное копирование ещё раз."
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "การเชื่อมต่อกับเซิร์ฟเวอร์หลุดระหว่างการสำรองข้อมูล ส่วนที่เหลือจะถูกอ่านนอกสแนปช็อตและการตั้งค่าของการสำรองข้อมูล จึงไม่ได้บันทึกอะไรไว้ โปรดสำรองข้อมูลอีกครั้ง"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yedekleme sırasında sunucu bağlantısı koptu. Geri kalanı yedeklemenin anlık görüntüsü ve ayarları dışında okunacaktı, bu yüzden hiçbir şey kaydedilmedi. Yedeklemeyi yeniden çalıştırın."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kết nối tới máy chủ bị ngắt trong khi sao lưu. Phần còn lại sẽ được đọc ngoài ảnh chụp và cài đặt của bản sao lưu, nên không có gì được lưu. Hãy chạy lại sao lưu."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "备份期间与服务器的连接中断。其余部分将在备份的快照和设置之外读取，因此未保存任何内容。请重新运行备份。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "備份期間與伺服器的連線中斷。其餘部分將在備份的快照與設定之外讀取，因此未儲存任何內容。請重新執行備份。"
+          }
+        }
+      }
+    },
     "The message could not be accepted. Please check it and try again.": {
       "extractionState": "manual",
       "localizations": {

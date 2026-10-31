@@ -478,6 +478,32 @@ final class DatabaseBackupViewModelTests: XCTestCase {
         XCTAssertTrue(siblings.filter { $0.hasPrefix(".\(tempFileURL.lastPathComponent).tmp-") }.isEmpty, "geçici dosya artık kalmamalı")
     }
 
+    /// The server drops the backup's connection part-way through. The
+    /// service reconnects on its own, but the new session has neither the
+    /// snapshot nor the settings the backup read under, so the backup must
+    /// fail and save nothing rather than carry on.
+    func testBackupFailsAndSavesNothingWhenItsConnectionIsReplaced() async throws {
+        let viewModel = makeViewModel()
+        await viewModel.loadDatabasesAndObjects()
+        viewModel.outputFileURL = tempFileURL
+        viewModel.outputLocationIsGranted = true
+        viewModel.interObjectDelay = .milliseconds(300)
+        let idRows = try await service.query("SELECT CONNECTION_ID() AS id")
+        let connectionID = try XCTUnwrap(idRows.first?.column("id")?.int)
+
+        viewModel.startBackup()
+        try await Task.sleep(for: .milliseconds(100))
+        let killer = MySQLService()
+        try await killer.connect(host: TestDatabase.host, port: TestDatabase.port, username: TestDatabase.username, password: TestDatabase.password, database: nil)
+        try await killer.execute("KILL \(connectionID)")
+        try await killer.disconnect()
+        while viewModel.isRunning { await Task.yield() }
+
+        XCTAssertEqual(viewModel.errorMessage, DatabaseBackupViewModel.BackupError.connectionReplaced.errorDescription)
+        XCTAssertFalse(viewModel.didFinishSuccessfully)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: tempFileURL.path))
+    }
+
     func testRunBackupToUnwritablePathSetsErrorMessageInsteadOfCrashing() async throws {
         let viewModel = makeViewModel()
         await viewModel.loadDatabasesAndObjects()
