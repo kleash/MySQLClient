@@ -527,9 +527,13 @@ final class DatabaseBackupViewModel: ObservableObject {
     /// latest commit. `performBackup` rolls back to the savepoint after each
     /// object.
     private func beginSourceSession() async throws {
-        if options.source.lockTablesForReading, !selectedTables.isEmpty {
-            let lockList = selectedTables.sorted { $0.name < $1.name }.map { "\(SQLExporter.quoted($0.name)) READ" }.joined(separator: ", ")
-            _ = try await service.textQuery("LOCK TABLES \(lockList)")
+        // Views as well, which can't be read unless they're locked too, and
+        // by their full names: the connection's own database may be another
+        // one, or none.
+        let lockedNames = (selectedTables.map(\.name) + selectedViews.map(\.name)).sorted()
+        if options.source.lockTablesForReading, !lockedNames.isEmpty {
+            let lockList = try lockedNames.map { try SchemaIntrospectionService.qualifiedIdentifier(database: database.name, name: $0) + " READ" }
+            _ = try await service.textQuery("LOCK TABLES \(lockList.joined(separator: ", "))")
         }
         if options.source.useSingleTransaction {
             _ = try await service.textQuery("SET SESSION TRANSACTION ISOLATION LEVEL REPEATABLE READ")

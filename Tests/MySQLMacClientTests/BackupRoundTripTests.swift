@@ -118,6 +118,17 @@ final class BackupRoundTripTests: XCTestCase {
         XCTAssertLessThan(reads, 7_000, "700 rows")
     }
 
+    /// Locking tables instead of reading one snapshot, from a connection
+    /// with no database of its own selected.
+    func testBackupLockingTablesRestoresEveryObjectAndRowExactly() async throws {
+        let before = try await fingerprint(of: database)
+        try await backUp { $0.source.lockTablesForReading = true }
+        _ = try await service.rawQuery("DROP DATABASE `\(database)`")
+        try await restore()
+
+        assertSame(try await fingerprint(of: database), before)
+    }
+
     /// Structure only: every definition comes back, and no table's rows but
     /// a sequence's one row, which holds its definition as well as where it
     /// has got to.
