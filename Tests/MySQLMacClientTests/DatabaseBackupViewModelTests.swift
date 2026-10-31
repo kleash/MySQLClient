@@ -478,30 +478,80 @@ final class DatabaseBackupViewModelTests: XCTestCase {
         XCTAssertTrue(siblings.filter { $0.hasPrefix(".\(tempFileURL.lastPathComponent).tmp-") }.isEmpty, "geçici dosya artık kalmamalı")
     }
 
-    /// The server drops the backup's connection part-way through. The
-    /// service reconnects on its own, but the new session has neither the
-    /// snapshot nor the settings the backup read under, so the backup must
-    /// fail and save nothing rather than carry on.
-    func testBackupFailsAndSavesNothingWhenItsConnectionIsReplaced() async throws {
+    /// The server drops the backup's connection part-way through. A new
+    /// session would have neither the snapshot nor the settings the backup
+    /// reads under, so the backup must fail and save nothing rather than
+    /// carry on.
+    func testBackupFailsAndSavesNothingWhenItsConnectionDrops() async throws {
         let viewModel = makeViewModel()
         await viewModel.loadDatabasesAndObjects()
         viewModel.outputFileURL = tempFileURL
         viewModel.outputLocationIsGranted = true
         viewModel.interObjectDelay = .milliseconds(300)
-        let idRows = try await service.query("SELECT CONNECTION_ID() AS id")
-        let connectionID = try XCTUnwrap(idRows.first?.column("id")?.int)
+        let newest = try await service.query("SELECT MAX(ID) AS id FROM information_schema.PROCESSLIST")
+        let newestBefore = try XCTUnwrap(newest.first?.column("id")?.int)
 
         viewModel.startBackup()
+        // Into the pause after the first object.
+        while viewModel.progress?.currentObjectDescription.isEmpty ?? true { await Task.yield() }
         try await Task.sleep(for: .milliseconds(100))
+        let backupConnection = try await service.query("""
+            SELECT ID AS id FROM information_schema.PROCESSLIST
+            WHERE ID > \(newestBefore) AND DB = 'mysqlmacclient_test'
+            """)
+        try await kill(XCTUnwrap(backupConnection.first?.column("id")?.int, "the backup reads on a connection of its own"))
+        while viewModel.isRunning { await Task.yield() }
+
+        XCTAssertEqual(viewModel.errorMessage, DatabaseBackupViewModel.BackupError.connectionLost.errorDescription)
+        XCTAssertFalse(viewModel.didFinishSuccessfully)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: tempFileURL.path))
+    }
+
+    /// The app's connection dropped while the dialog sat open (a server
+    /// with a short wait_timeout). The backup opens one of its own, so it
+    /// isn't affected.
+    func testBackupRunsAfterTheAppsConnectionDroppedWhileIdle() async throws {
+        let viewModel = makeViewModel()
+        await viewModel.loadDatabasesAndObjects()
+        viewModel.outputFileURL = tempFileURL
+        viewModel.outputLocationIsGranted = true
+        viewModel.options.mode = .structureOnly
+        let idRows = try await service.query("SELECT CONNECTION_ID() AS id")
+        try await kill(XCTUnwrap(idRows.first?.column("id")?.int))
+
+        viewModel.startBackup()
+        while viewModel.isRunning { await Task.yield() }
+
+        XCTAssertNil(viewModel.errorMessage)
+        XCTAssertTrue(viewModel.didFinishSuccessfully)
+    }
+
+    /// A transaction the user left open on the app's connection stays
+    /// theirs: a backup's START TRANSACTION on that connection would commit
+    /// it, and their ROLLBACK would then undo nothing.
+    func testBackupLeavesATransactionOpenOnTheAppsConnectionAlone() async throws {
+        _ = try await service.rawQuery("START TRANSACTION")
+        try await service.execute("INSERT INTO tags (name) VALUES ('not committed')")
+        let viewModel = makeViewModel()
+        await viewModel.loadDatabasesAndObjects()
+        viewModel.outputFileURL = tempFileURL
+        viewModel.outputLocationIsGranted = true
+
+        viewModel.startBackup()
+        while viewModel.isRunning { await Task.yield() }
+        _ = try await service.rawQuery("ROLLBACK")
+
+        XCTAssertNil(viewModel.errorMessage)
+        let rows = try await service.query("SELECT COUNT(*) AS n FROM tags WHERE name = 'not committed'")
+        try await service.execute("DELETE FROM tags WHERE name = 'not committed'")
+        XCTAssertEqual(rows.first?.column("n")?.int, 0)
+    }
+
+    private func kill(_ connectionID: Int) async throws {
         let killer = MySQLService()
         try await killer.connect(host: TestDatabase.host, port: TestDatabase.port, username: TestDatabase.username, password: TestDatabase.password, database: nil)
         try await killer.execute("KILL \(connectionID)")
         try await killer.disconnect()
-        while viewModel.isRunning { await Task.yield() }
-
-        XCTAssertEqual(viewModel.errorMessage, DatabaseBackupViewModel.BackupError.connectionReplaced.errorDescription)
-        XCTAssertFalse(viewModel.didFinishSuccessfully)
-        XCTAssertFalse(FileManager.default.fileExists(atPath: tempFileURL.path))
     }
 
     func testRunBackupToUnwritablePathSetsErrorMessageInsteadOfCrashing() async throws {

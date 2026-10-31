@@ -70,11 +70,10 @@ actor MySQLService {
 
     private(set) var isConnected: Bool = false
 
-    /// How many connections this service has opened, silent reconnects
-    /// included. A caller that depends on its session staying the same
-    /// (a backup's snapshot and settings) compares it to notice the session
-    /// was replaced underneath it.
-    private(set) var connectionCount = 0
+    /// Off for a connection opened for one job (`openSeparateConnection`):
+    /// a new session would have lost the job's database and settings, so a
+    /// drop has to end the job rather than carry on somewhere else.
+    private var reconnectsAutomatically = true
 
     /// Whatever `SELECT VERSION()` returned on connect — e.g.
     /// `"10.4.32-MariaDB"` or `"8.0.45"`. Read once per connection rather
@@ -119,7 +118,6 @@ actor MySQLService {
             self.eventLoopGroup = group
             self.connection = conn
             self.isConnected = true
-            self.connectionCount += 1
             self.lastCredentials = (host, port, username, password, database)
             // Best-effort: a server that won't answer this is still a
             // perfectly usable connection, so a failure here is swallowed
@@ -130,6 +128,28 @@ actor MySQLService {
             try? await group.shutdownGracefully()
             throw error
         }
+    }
+
+    /// A second connection with this one's credentials, for a job that
+    /// changes its session (a restore runs USE and the file's own SET
+    /// statements) and so mustn't share the connection the rest of the app
+    /// is using. It doesn't reconnect by itself.
+    func openSeparateConnection() async throws -> MySQLService {
+        guard let credentials = lastCredentials else { throw MySQLServiceError.notConnected }
+        let separate = MySQLService()
+        try await separate.connect(
+            host: credentials.host,
+            port: credentials.port,
+            username: credentials.username,
+            password: credentials.password,
+            database: credentials.database
+        )
+        await separate.disableAutomaticReconnect()
+        return separate
+    }
+
+    private func disableAutomaticReconnect() {
+        reconnectsAutomatically = false
     }
 
     func disconnect() async throws {
@@ -250,7 +270,7 @@ actor MySQLService {
         do {
             return try await operation()
         } catch MySQLError.closed {
-            guard let credentials = lastCredentials else { throw MySQLError.closed }
+            guard reconnectsAutomatically, let credentials = lastCredentials else { throw MySQLError.closed }
             try await connect(
                 host: credentials.host,
                 port: credentials.port,

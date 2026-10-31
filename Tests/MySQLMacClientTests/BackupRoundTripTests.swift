@@ -50,14 +50,16 @@ final class BackupRoundTripTests: XCTestCase {
 
     func testBackupRestoresEveryObjectAndRowExactly() async throws {
         let before = try await fingerprint(of: database)
-        // Reading in another time zone and with ANSI_QUOTES must not change
-        // what the file says.
+        // Another time zone, ANSI_QUOTES and latin1 on the app's connection
+        // must not change what the file says.
         _ = try await service.rawQuery("SET SESSION time_zone = '-08:00', sql_mode = 'ANSI_QUOTES'")
+        _ = try await service.rawQuery("SET NAMES latin1")
         try await backUp()
         let readingSession = try await service.textQuery("SELECT @@SESSION.time_zone AS tz, @@SESSION.sql_mode AS mode").first
         XCTAssertEqual(readingSession?.column("tz")?.string, "-08:00", "the backup must hand the session back as it found it")
         XCTAssertEqual(readingSession?.column("mode")?.string, "ANSI_QUOTES")
         _ = try await service.rawQuery("SET SESSION time_zone = DEFAULT, sql_mode = DEFAULT")
+        _ = try await service.rawQuery("SET NAMES utf8mb4")
 
         _ = try await service.rawQuery("DROP DATABASE `\(database)`")
         try await restore()
@@ -99,14 +101,18 @@ final class BackupRoundTripTests: XCTestCase {
         viewModel.dataPageSize = 7
         viewModel.outputFileURL = dumpURL
         viewModel.outputLocationIsGranted = true
-        _ = try await service.rawQuery("FLUSH STATUS")
+        // Server-wide: the backup reads on a connection of its own.
+        func readsSoFar() async throws -> Int {
+            try await service.textQuery("SHOW GLOBAL STATUS WHERE Variable_name IN ('Handler_read_next', 'Handler_read_rnd_next')")
+                .compactMap { $0.column("Value")?.string.flatMap { Int($0) } }
+                .reduce(0, +)
+        }
+        let before = try await readsSoFar()
         viewModel.startBackup()
         while viewModel.isRunning { await Task.yield() }
         XCTAssertNil(viewModel.errorMessage)
 
-        let reads = try await service.textQuery("SHOW SESSION STATUS WHERE Variable_name IN ('Handler_read_next', 'Handler_read_rnd_next')")
-            .compactMap { $0.column("Value")?.string.flatMap { Int($0) } }
-            .reduce(0, +)
+        let reads = try await readsSoFar() - before
         XCTAssertLessThan(reads, 7_000, "700 rows")
     }
 

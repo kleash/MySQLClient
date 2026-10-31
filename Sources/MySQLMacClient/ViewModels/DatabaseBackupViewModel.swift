@@ -31,7 +31,7 @@ final class DatabaseBackupViewModel: ObservableObject {
     }
 
     enum BackupError: LocalizedError {
-        case connectionReplaced
+        case connectionLost
 
         var errorDescription: String? {
             String(localized: "The connection to the server dropped during the backup. The rest would have been read outside the backup's snapshot and settings, so nothing was saved. Run the backup again.")
@@ -145,21 +145,20 @@ final class DatabaseBackupViewModel: ObservableObject {
             + selectedTriggers.count + selectedEvents.count
     }
 
-    private let service: MySQLService
-    private let introspection: SchemaIntrospectionService
+    /// The connection everything is read through: the app's shared one
+    /// while the dialog lists objects, and one of the backup's own while it
+    /// runs (`performBackup`).
+    private var service: MySQLService
+    private var introspection: SchemaIntrospectionService { SchemaIntrospectionService(service: service) }
     private var backupTask: Task<Void, Never>?
     /// Progress bookkeeping for the run in flight — see `Progress`.
     private var totalUnits = 0
     private var unitsBeforeCurrentObject = 0
-    private var savedSessionSettings: (timeZone: String, sqlMode: String)?
     private var wroteViewStandIns = false
-    /// `MySQLService.connectionCount` when the backup's session began.
-    private var sessionConnectionCount = 0
 
     init(service: MySQLService, database: DatabaseInfo) {
         self.service = service
         self.database = database
-        self.introspection = SchemaIntrospectionService(service: service)
     }
 
     // MARK: - Loading
@@ -184,13 +183,27 @@ final class DatabaseBackupViewModel: ObservableObject {
     /// auto-generated, so a path the user actually browsed to is left
     /// alone.
     func selectDatabase(_ newDatabase: DatabaseInfo) async {
-        guard newDatabase != database else { return }
+        // Not mid-run: the rest of the backup would be read from the other
+        // database.
+        guard newDatabase != database, !isRunning else { return }
         let previousDefault = defaultOutputURL()
         database = newDatabase
         if outputFileURL == nil || outputFileURL == previousDefault {
             outputFileURL = defaultOutputURL()
         }
         await loadObjects()
+    }
+
+    /// Lists on a connection of its own when one opens, as the backup reads
+    /// (`performBackup`): names come back in the session's character set,
+    /// so after SET NAMES latin1 in the console one outside it (an emoji, a
+    /// combining mark) would come back as '?', naming another object or none.
+    private func loadObjects() async {
+        isLoadingObjects = true
+        defer { isLoadingObjects = false }
+        let own = try? await service.openSeparateConnection()
+        await listObjects(on: own ?? service)
+        try? await own?.disconnect()
     }
 
     /// Tables/views and routines are fetched as two independent steps, not
@@ -202,9 +215,9 @@ final class DatabaseBackupViewModel: ObservableObject {
     /// listed. That failure degrades to two empty categories plus a
     /// non-blocking note, instead of an empty dialog with a single
     /// all-encompassing error.
-    private func loadObjects() async {
-        isLoadingObjects = true
-        defer { isLoadingObjects = false }
+    private func listObjects(on service: MySQLService) async {
+        // The listing connection's, not the properties'.
+        let introspection = SchemaIntrospectionService(service: service)
         errorMessage = nil
         loadWarning = nil
 
@@ -336,55 +349,62 @@ final class DatabaseBackupViewModel: ObservableObject {
     /// writes to a temp sibling throughout and only replaces the real
     /// target on a clean finish, so a failed or cancelled run now leaves
     /// whatever was already there completely untouched.
+    ///
+    /// Reads on a connection of its own, so its transaction, locks and
+    /// settings never reach the session the rest of the app shares: a grid
+    /// edit saved meanwhile would run inside the backup's snapshot and
+    /// settings, and its START TRANSACTION would commit whatever the user
+    /// had left open there. That connection doesn't reconnect by itself, as
+    /// a new session would have neither, so a drop fails the backup.
     private func performBackup() async {
         defer { isRunning = false; backupTask = nil }
 
         guard let outputFileURL else { return }
         let objects = buildObjectPlan()
-        let weights = await unitWeights(for: objects)
-        totalUnits = weights.reduce(0, +)
-        unitsBeforeCurrentObject = 0
-        wroteViewStandIns = false
-        progress = Progress(
-            completedObjects: 0, totalObjects: objects.count,
-            completedUnits: 0, totalUnits: totalUnits,
-            currentObjectDescription: ""
-        )
-
+        let shared = service
+        var source: MySQLService?
         do {
+            let connection = try await shared.openSeparateConnection()
+            source = connection
+            service = connection
+            // In UTC and with an empty SQL mode, as mysqldump reads: TIMESTAMP
+            // values come out in the session's time zone, and modes such as
+            // `ANSI_QUOTES` change how `SHOW CREATE` writes a statement. The
+            // file declares the same time zone (`writeHeader`).
+            _ = try await connection.textQuery("SET SESSION time_zone = '+00:00', sql_mode = ''")
+            let weights = await unitWeights(for: objects)
+            totalUnits = weights.reduce(0, +)
+            unitsBeforeCurrentObject = 0
+            wroteViewStandIns = false
+            progress = Progress(
+                completedObjects: 0, totalObjects: objects.count,
+                completedUnits: 0, totalUnits: totalUnits,
+                currentObjectDescription: ""
+            )
+
             try await AtomicFileWriter.write(to: outputFileURL) { fileHandle in
                 try await self.beginSourceSession()
-                do {
-                    try await self.writeHeader(to: fileHandle)
-                    for (index, object) in objects.enumerated() {
-                        try Task.checkCancellation()
-                        self.progress = Progress(
-                            completedObjects: index, totalObjects: objects.count,
-                            completedUnits: self.unitsBeforeCurrentObject, totalUnits: self.totalUnits,
-                            currentObjectDescription: object.description
-                        )
-                        try await self.dump(object, to: fileHandle)
-                        try await self.ensureSameSession()
-                        self.unitsBeforeCurrentObject += weights[index]
-                        if self.interObjectDelay != .zero {
-                            try await Task.sleep(for: self.interObjectDelay)
-                        }
-                    }
+                try await self.writeHeader(to: fileHandle)
+                for (index, object) in objects.enumerated() {
                     try Task.checkCancellation()
-                    try await self.writeFooter(to: fileHandle)
-                    try await self.endSourceSession()
                     self.progress = Progress(
-                        completedObjects: objects.count, totalObjects: objects.count,
-                        completedUnits: self.totalUnits, totalUnits: self.totalUnits,
-                        currentObjectDescription: String(localized: "Completed")
+                        completedObjects: index, totalObjects: objects.count,
+                        completedUnits: self.unitsBeforeCurrentObject, totalUnits: self.totalUnits,
+                        currentObjectDescription: object.description
                     )
-                } catch {
-                    // Best-effort: release whatever `beginSourceSession`
-                    // took, even though the backup itself failed or was
-                    // cancelled.
-                    try? await self.endSourceSession()
-                    throw error
+                    try await self.dump(object, to: fileHandle)
+                    self.unitsBeforeCurrentObject += weights[index]
+                    if self.interObjectDelay != .zero {
+                        try await Task.sleep(for: self.interObjectDelay)
+                    }
                 }
+                try Task.checkCancellation()
+                try await self.writeFooter(to: fileHandle)
+                self.progress = Progress(
+                    completedObjects: objects.count, totalObjects: objects.count,
+                    completedUnits: self.totalUnits, totalUnits: self.totalUnits,
+                    currentObjectDescription: String(localized: "Completed")
+                )
             }
             // Only reached once `AtomicFileWriter` has actually performed
             // its atomic replace — the file is genuinely on disk, not just
@@ -393,10 +413,16 @@ final class DatabaseBackupViewModel: ObservableObject {
             AnalyticsService.trackFeatureUsed("db_backup")
         } catch is CancellationError {
             // User-initiated — not an error to surface.
+        } catch MySQLError.closed {
+            errorMessage = BackupError.connectionLost.errorDescription
+            AnalyticsService.trackError(BackupError.connectionLost, feature: "db_backup")
         } catch {
             errorMessage = describe(error)
             AnalyticsService.trackError(error, feature: "db_backup")
         }
+        // Also ends the backup's transaction and releases its locks.
+        try? await source?.disconnect()
+        service = shared
     }
 
     /// Tables first, with CREATE+DATA interleaved per table (not two
@@ -451,59 +477,18 @@ final class DatabaseBackupViewModel: ObservableObject {
 
     // MARK: - Source session (LOCK TABLES / START TRANSACTION)
 
-    /// `rawQuery`, not `execute` — matching `MainWindowView.dropRoutine`'s
-    /// established precedent that `DROP PROCEDURE`/`FUNCTION` are rejected
-    /// by MySQL's prepared-statement protocol; `LOCK TABLES`/`UNLOCK
-    /// TABLES`/`START TRANSACTION`/`COMMIT` are the same family of
-    /// session-control statement, so this uses the same safe default
-    /// throughout rather than assuming `execute` handles them.
-    ///
-    /// Also reads in UTC and with an empty SQL mode, as mysqldump does:
-    /// TIMESTAMP values come out in the session's time zone, and modes such
-    /// as `ANSI_QUOTES` change how `SHOW CREATE` writes a statement. The
-    /// file declares the same time zone (`writeHeader`). The connection is
-    /// shared with the rest of the app, so `endSourceSession` puts the
-    /// session's own settings back.
+    /// Over the text protocol (`textQuery`), one round trip each: MariaDB
+    /// refuses `LOCK TABLES` and `START TRANSACTION` as prepared statements,
+    /// which `rawQuery` would try first. Nothing here is undone at the end:
+    /// closing the backup's connection (`performBackup`) ends the
+    /// transaction and releases the locks.
     private func beginSourceSession() async throws {
-        sessionConnectionCount = await service.connectionCount
-        let current = try await service.textQuery("SELECT @@SESSION.time_zone AS time_zone, @@SESSION.sql_mode AS sql_mode").first
-        savedSessionSettings = (
-            timeZone: current?.column("time_zone")?.string ?? "SYSTEM",
-            sqlMode: current?.column("sql_mode")?.string ?? ""
-        )
-        _ = try await service.rawQuery("SET SESSION time_zone = '+00:00', sql_mode = ''")
         if options.source.lockTablesForReading, !selectedTables.isEmpty {
             let lockList = selectedTables.sorted { $0.name < $1.name }.map { "\(SQLExporter.quoted($0.name)) READ" }.joined(separator: ", ")
-            _ = try await service.rawQuery("LOCK TABLES \(lockList)")
+            _ = try await service.textQuery("LOCK TABLES \(lockList)")
         }
         if options.source.useSingleTransaction {
-            _ = try await service.rawQuery("START TRANSACTION WITH CONSISTENT SNAPSHOT")
-        }
-    }
-
-    private func endSourceSession() async throws {
-        if options.source.lockTablesForReading, !selectedTables.isEmpty {
-            _ = try await service.rawQuery("UNLOCK TABLES")
-        }
-        if options.source.useSingleTransaction {
-            _ = try await service.rawQuery("COMMIT")
-        }
-        if let saved = savedSessionSettings {
-            savedSessionSettings = nil
-            _ = try await service.rawQuery("""
-                SET SESSION time_zone = '\(SQLExporter.escapeStringLiteral(saved.timeZone))', \
-                sql_mode = '\(SQLExporter.escapeStringLiteral(saved.sqlMode))'
-                """)
-        }
-    }
-
-    /// Throws once the connection has been silently reopened
-    /// (`MySQLService` does that after a drop): whatever was read since came
-    /// from a new session, without the snapshot and settings
-    /// `beginSourceSession` set up, so the file can't be trusted.
-    private func ensureSameSession() async throws {
-        guard await service.connectionCount == sessionConnectionCount else {
-            throw BackupError.connectionReplaced
+            _ = try await service.textQuery("START TRANSACTION WITH CONSISTENT SNAPSHOT")
         }
     }
 
