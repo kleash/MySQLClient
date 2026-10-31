@@ -395,6 +395,10 @@ final class BackupRoundTripTests: XCTestCase {
         "INSERT INTO empty_member VALUES (1, 'not a member', 0), (2, '', 1), (3, 'a', 3)",
         "SET SESSION sql_mode = DEFAULT",
 
+        // Invisible columns, which SELECT * leaves out.
+        "CREATE TABLE hidden_cols (id INT PRIMARY KEY, secret VARCHAR(10) INVISIBLE, n INT DEFAULT 5 INVISIBLE)",
+        "INSERT INTO hidden_cols (id, secret, n) VALUES (1, 'shh', 42), (2, NULL, 7)",
+
         // ---- End of values and paging, continued ----
 
         // Names that need quoting.
