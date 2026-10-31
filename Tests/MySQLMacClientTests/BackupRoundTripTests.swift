@@ -28,7 +28,8 @@ final class BackupRoundTripTests: XCTestCase {
         _ = try await service.rawQuery("DROP DATABASE IF EXISTS `\(database)`")
         _ = try await service.rawQuery("CREATE DATABASE `\(database)` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci")
         _ = try await service.rawQuery("USE `\(database)`")
-        for statement in Self.corpus {
+        let isMariaDB = await service.serverVersion?.contains("MariaDB") ?? false
+        for statement in Self.corpus + (isMariaDB ? Self.mariaDBCorpus : []) {
             do {
                 _ = try await service.rawQuery(statement)
             } catch {
@@ -333,5 +334,15 @@ final class BackupRoundTripTests: XCTestCase {
         "SET SESSION time_zone = '+03:00'",
         "CREATE EVENT nightly ON SCHEDULE EVERY 1 DAY STARTS '2030-01-01 02:00:00' DISABLE DO DELETE FROM no_key WHERE v < 0",
         "SET SESSION time_zone = DEFAULT",
+    ]
+
+    /// MariaDB-only objects.
+    private static let mariaDBCorpus: [String] = [
+        // A sequence that has handed out numbers: it must carry on from
+        // where it was, not start over.
+        "CREATE SEQUENCE order_numbers START WITH 100 INCREMENT BY 5",
+        "CREATE SEQUENCE uncached START WITH 7 CACHE 0",
+        "SELECT NEXTVAL(uncached)",
+        "SELECT NEXTVAL(order_numbers), NEXTVAL(order_numbers)",
     ]
 }
