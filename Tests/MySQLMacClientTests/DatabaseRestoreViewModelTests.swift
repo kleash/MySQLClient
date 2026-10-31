@@ -80,16 +80,33 @@ final class DatabaseRestoreViewModelTests: XCTestCase {
         XCTAssertEqual(restored, [1, 2])
     }
 
-    /// A lenient decode would store U+FFFD in place of these bytes.
+    /// A lenient decode would store U+FFFD in place of these bytes. The
+    /// error names the line they are on, not just where their statement
+    /// starts: in a HeidiSQL INSERT, a row per line, that can be far apart.
     func testRefusesAStatementThatIsNotUTF8InsteadOfAlteringIt() async throws {
-        var contents = Data("CREATE TABLE t (id INT PRIMARY KEY, b BLOB);\nINSERT INTO t VALUES (1, '".utf8)
+        var contents = Data("CREATE TABLE t (id INT PRIMARY KEY, b BLOB);\nINSERT INTO t VALUES\n\t(1, 'ok'),\n\t(2, '".utf8)
         contents.append(contentsOf: [0xFF, 0xFE, 0x00, 0xC3])
-        contents.append(Data("');\nINSERT INTO t VALUES (2, 'ok');\n".utf8))
+        contents.append(Data("');\nINSERT INTO t VALUES (3, 'ok');\n".utf8))
         let viewModel = try await restore(contents)
 
-        XCTAssertEqual(viewModel.failure, .notUTF8(line: 2))
+        XCTAssertEqual(viewModel.failure, .notUTF8(line: 4))
         let restored = try await ids(in: "t")
         XCTAssertEqual(restored, [])
+    }
+
+    /// The server numbers an error's line within the statement it was sent;
+    /// the list of failed statements names the file's line.
+    func testNamesTheFilesLineInAStatementsError() async throws {
+        let viewModel = try await restore(Data("""
+            CREATE TABLE t (id INT PRIMARY KEY);
+            -- the INSERT below has a mistake on its second line
+            INSERT INTO t
+            VALUES (1,, 2);
+            """.utf8))
+
+        XCTAssertEqual(viewModel.statementErrors.map(\.line), [3])
+        let message = try XCTUnwrap(viewModel.statementErrors.first?.message)
+        XCTAssertTrue(message.hasSuffix("at line 4"), message)
     }
 
     /// MySQLNIO sends a statement as one packet, whose length is 3 bytes,

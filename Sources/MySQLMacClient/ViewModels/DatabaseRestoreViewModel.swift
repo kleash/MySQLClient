@@ -203,7 +203,7 @@ final class DatabaseRestoreViewModel: ObservableObject {
                     // Strict: a lenient decode would turn bytes that aren't
                     // UTF-8 into U+FFFD and store that instead.
                     guard let text = String(bytes: statement.sql, encoding: .utf8) else {
-                        throw RestoreError.notUTF8(line: line)
+                        throw RestoreError.notUTF8(line: line + Self.lineBreaksBeforeInvalidUTF8(in: statement.sql))
                     }
                     let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
                     if !useDatabaseNamedInFile, let name = Self.databaseName(in: trimmed) {
@@ -224,7 +224,8 @@ final class DatabaseRestoreViewModel: ObservableObject {
                         if case MySQLError.closed = error {
                             throw RestoreError.connectionLost(line: line)
                         }
-                        statementErrors.append(StatementError(line: line, statement: String(sql.prefix(300)), message: describe(error)))
+                        let message = SQLConsoleViewModel.relocatingErrorLine(in: describe(error), by: statement.line)
+                        statementErrors.append(StatementError(line: line, statement: String(sql.prefix(300)), message: message))
                         if stopOnFirstError { throw RestoreError.stoppedAtError(line: line) }
                     }
                 }
@@ -245,6 +246,16 @@ final class DatabaseRestoreViewModel: ObservableObject {
             AnalyticsService.trackError(error, feature: "db_restore")
         }
         try? await target?.disconnect()
+    }
+
+    /// Line breaks ahead of the first byte of `bytes` that isn't UTF-8, so
+    /// the error names the line that holds it.
+    private static func lineBreaksBeforeInvalidUTF8(in bytes: [UInt8]) -> Int {
+        var parser = Unicode.UTF8.ForwardParser()
+        var iterator = bytes.makeIterator()
+        var valid = 0
+        while case .valid(let scalar) = parser.parseScalar(from: &iterator) { valid += scalar.count }
+        return bytes[..<valid].count { $0 == UInt8(ascii: "\n") }
     }
 
     /// Whether the session's sql_mode has NO_BACKSLASH_ESCAPES, which the
