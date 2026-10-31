@@ -633,10 +633,20 @@ final class DatabaseBackupViewModel: ObservableObject {
         // significant digits (16777216 as 16777200), while the DOUBLE holds
         // its exact value, which converts back to the very same FLOAT.
         // Multiplied by 1 rather than added to 0, which turns -0 into 0.
+        //
+        // An ENUM or SET that declares '' is read as its number: as text
+        // that member is '', the same as an ENUM's error value or a SET's
+        // empty set. (A type that only looks as if it declares '' is read
+        // as numbers too, which restore just as well.)
         let selectExpressions = columns.map { column in
-            column.mysqlType.lowercased().hasPrefix("float")
-                ? "\(SQLExporter.quoted(column.name)) * 1e0"
-                : SQLExporter.quoted(column.name)
+            let type = column.mysqlType.lowercased()
+            if type.hasPrefix("float") {
+                return "\(SQLExporter.quoted(column.name)) * 1e0"
+            }
+            if type.range(of: #"^(enum|set)\((.*,)?''[,)]"#, options: .regularExpression) != nil {
+                return "\(SQLExporter.quoted(column.name)) + 0"
+            }
+            return SQLExporter.quoted(column.name)
         }
         let selectList = selectExpressions.joined(separator: ", ")
 

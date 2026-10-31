@@ -387,6 +387,14 @@ final class BackupRoundTripTests: XCTestCase {
         "CREATE TABLE negative_zero (id INT PRIMARY KEY, f FLOAT, d DOUBLE)",
         "INSERT INTO negative_zero VALUES (1, -0e0, -0e0), (2, 0e0, 0e0)",
 
+        // An ENUM and a SET that declare '', which reads the same as the
+        // ENUM's error value (what an invalid value is stored as outside
+        // strict mode) and the SET's empty set.
+        "CREATE TABLE empty_member (id INT PRIMARY KEY, e ENUM('', 'a'), s SET('', 'a'))",
+        "SET SESSION sql_mode = ''",
+        "INSERT INTO empty_member VALUES (1, 'not a member', 0), (2, '', 1), (3, 'a', 3)",
+        "SET SESSION sql_mode = DEFAULT",
+
         // ---- End of values and paging, continued ----
 
         // Names that need quoting.
