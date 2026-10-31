@@ -256,4 +256,44 @@ final class DelimiterScriptTests: XCTestCase {
         let script = "DELIMITER $$\nCREATE PROCEDURE `p`()\nBEGIN\n    SELECT 1;\nEND$$\nDELIMITER ;\nSELECT 2;"
         XCTAssertEqual(DelimiterScript.locatedStatements(from: script).map(\.lineOffset), [1, 6])
     }
+
+    // MARK: - Splitter (a script read in chunks)
+
+    /// Every chunk size from one byte up must give exactly the statements,
+    /// and lines, of splitting the whole script at once: cuts inside
+    /// strings, comments, multi-byte characters, a `DELIMITER` line and a
+    /// two-character delimiter all have to come out the same.
+    func testSplitterMatchesTheWholeScriptAtEveryChunkSize() throws {
+        let script = """
+            SET NAMES utf8mb4; -- comment; with a semicolon
+            INSERT INTO t VALUES ('a;b', 'it''s', 'back\\'slash; x', "dq;", `c;`), ('😀 ünï 中文;');
+            # hash comment;
+            /* block; comment */ SELECT 1 /*! executable; */;\r
+            SELECT 5--3;
+            DELIMITER $$
+            CREATE PROCEDURE p()
+            BEGIN
+                SELECT ';$'; SELECT '$$ in a string';
+            END$$
+            DELIMITER ;
+            SELECT 'DELIMITER $$ not a directive here'; SELECT 2;   DELIMITER ignored mid-line;
+            SELECT 'unterminated last statement'
+            """
+        let expected = DelimiterScript.locatedStatements(from: script)
+        XCTAssertEqual(expected.count, 9)
+        let bytes = Array(script.utf8)
+        for chunkSize in 1...bytes.count {
+            var splitter = DelimiterScript.Splitter()
+            var found: [(sql: [UInt8], line: Int)] = []
+            for start in stride(from: 0, to: bytes.count, by: chunkSize) {
+                found += splitter.feed(bytes[start..<min(start + chunkSize, bytes.count)])
+            }
+            found += splitter.finish()
+            let decoded = try found.map { statement in
+                let text = try XCTUnwrap(String(bytes: statement.sql, encoding: .utf8), "cut inside a character at chunk size \(chunkSize)")
+                return DelimiterScript.Statement(sql: text.trimmingCharacters(in: .whitespacesAndNewlines), lineOffset: statement.line)
+            }
+            XCTAssertEqual(decoded, expected, "chunk size \(chunkSize)")
+        }
+    }
 }

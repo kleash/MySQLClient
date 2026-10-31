@@ -88,40 +88,77 @@ enum DelimiterScript {
         // a many-megabyte dump fast, and sees `\r\n` as two bytes where
         // `Character` sees one that isn't equal to "\n".
         let bytes = Array(script.utf8)
-        let count = bytes.count
-        var statements: [Statement] = []
+        return scan(bytes, isFinal: true).statements.compactMap { found in
+            let statement = String(decoding: bytes[found.range], as: UTF8.self)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            return statement.isEmpty ? nil : Statement(sql: statement, lineOffset: found.line)
+        }
+    }
+
+    /// What a scan that stopped part-way needs to carry on from there.
+    struct ScanState: Equatable {
         var delimiter = Array(";".utf8)
+        var isAtLineStart = true
+        /// Line breaks before this point.
+        var line = 0
+    }
+
+    /// The scanner behind `locatedStatements(from:)`, over raw bytes, and
+    /// able to work through a script a piece at a time (a dump too big to
+    /// hold in memory, see `DatabaseRestoreViewModel`).
+    ///
+    /// With `isFinal` false, `bytes` may stop anywhere — inside a string, a
+    /// comment or a `DELIMITER` line. The scan then returns only statements
+    /// that are complete, `consumed` (how many leading bytes they took) and
+    /// the state after them; the caller passes the rest again, with more
+    /// bytes after it, and that state. Everything is decided exactly as one
+    /// scan of the whole script would decide it, since a statement only
+    /// ever ends at a delimiter or a whole `DELIMITER` line.
+    ///
+    /// Each statement comes back as its byte range in `bytes`, untrimmed,
+    /// with the line it starts on; decoding is left to the caller.
+    static func scan(
+        _ bytes: [UInt8],
+        from state: ScanState = ScanState(),
+        isFinal: Bool
+    ) -> (statements: [(range: Range<Int>, line: Int)], consumed: Int, state: ScanState) {
+        let count = bytes.count
+        var statements: [(range: Range<Int>, line: Int)] = []
+        var delimiter = state.delimiter
         // Offset of the current statement's first byte of SQL (and the
         // line that byte is on), `nil` while only whitespace and comments
         // have been seen since the last one.
         var statementStart: (offset: Int, line: Int)?
         // Line breaks passed so far — every loop below that steps over a
         // "\n" has to count it.
-        var line = 0
-        var isAtLineStart = true
+        var line = state.line
+        var isAtLineStart = state.isAtLineStart
         var index = 0
+        // The last point where a statement had just ended: where a scan
+        // that stops early can be picked up again.
+        var boundary = (offset: 0, state: state)
 
         func endStatement(at end: Int) {
             guard let start = statementStart else { return }
             statementStart = nil
-            let statement = String(decoding: bytes[start.offset..<end], as: UTF8.self)
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-            if !statement.isEmpty {
-                statements.append(Statement(sql: statement, lineOffset: start.line))
-            }
+            statements.append((start.offset..<end, start.line))
         }
 
         func byte(at offset: Int) -> UInt8? {
             offset < count ? bytes[offset] : nil
         }
 
-        while index < count {
+        scanning: while index < count {
             if isAtLineStart {
                 isAtLineStart = false
                 if let directive = delimiterDirective(in: bytes, lineStart: index) {
+                    // Without its line break, the line may go on in bytes
+                    // not read yet (`DELIMITER $` of `DELIMITER $$`).
+                    if !isFinal, directive.lineEnd == count { break scanning }
                     endStatement(at: index)
                     delimiter = directive.delimiter
                     index = directive.lineEnd
+                    boundary = (index, ScanState(delimiter: delimiter, isAtLineStart: false, line: line))
                     continue
                 }
             }
@@ -130,6 +167,7 @@ enum DelimiterScript {
             if current == delimiter[0], bytes[index...].starts(with: delimiter) {
                 endStatement(at: index)
                 index += delimiter.count
+                boundary = (index, ScanState(delimiter: delimiter, isAtLineStart: false, line: line))
                 continue
             }
 
@@ -184,8 +222,44 @@ enum DelimiterScript {
             }
         }
 
+        guard isFinal else {
+            return (statements, boundary.offset, boundary.state)
+        }
         endStatement(at: count)
-        return statements
+        return (statements, count, ScanState(delimiter: delimiter, isAtLineStart: isAtLineStart, line: line))
+    }
+
+    /// Splits a script handed over a piece at a time — a file read in
+    /// chunks — into the same statements `locatedStatements(from:)` finds
+    /// in the whole of it. Statements come back as raw bytes: one is only
+    /// ever cut at a delimiter, never inside a multi-byte character, and
+    /// the caller decides how strictly to decode it.
+    ///
+    /// shortcut: a statement longer than the chunks it arrives in is
+    /// scanned again from its start with each chunk; fine for dump-sized
+    /// statements (a few MB), slow for a single statement of hundreds of MB.
+    struct Splitter {
+        private var pending: [UInt8] = []
+        private var state = ScanState()
+
+        /// The statements `bytes` completes.
+        mutating func feed(_ bytes: some Sequence<UInt8>) -> [(sql: [UInt8], line: Int)] {
+            pending.append(contentsOf: bytes)
+            return take(isFinal: false)
+        }
+
+        /// Whatever is left once the script has ended, as the last statement.
+        mutating func finish() -> [(sql: [UInt8], line: Int)] {
+            take(isFinal: true)
+        }
+
+        private mutating func take(isFinal: Bool) -> [(sql: [UInt8], line: Int)] {
+            let result = DelimiterScript.scan(pending, from: state, isFinal: isFinal)
+            let statements = result.statements.map { (sql: Array(pending[$0.range]), line: $0.line) }
+            pending.removeFirst(result.consumed)
+            state = result.state
+            return statements
+        }
     }
 
     /// `"DELIMITER $$"` → `$$`, `"delimiter ;"` → `;`, along with where
