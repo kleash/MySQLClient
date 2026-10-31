@@ -6145,6 +6145,220 @@
         }
       }
     },
+    "Choose the folder ssh keeps your keys and known hosts in, usually .ssh in your home folder.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "اختر المجلد الذي يحفظ فيه ssh مفاتيحك والمضيفين المعروفين، وهو عادةً ‎.ssh في مجلد المنزل."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wählen Sie den Ordner aus, in dem ssh Ihre Schlüssel und bekannten Hosts speichert, normalerweise .ssh in Ihrem Benutzerordner."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Selecciona la carpeta donde ssh guarda tus claves y servidores conocidos, normalmente .ssh en tu carpeta de inicio."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choisissez le dossier où ssh conserve vos clés et vos hôtes connus, généralement .ssh dans votre dossier de départ."
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "वह फ़ोल्डर चुनें जिसमें ssh आपकी कुंजियाँ और ज्ञात होस्ट रखता है, आमतौर पर आपके होम फ़ोल्डर में .ssh।"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pilih folder tempat ssh menyimpan kunci Anda dan host yang dikenal, biasanya .ssh di folder home Anda."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scegli la cartella in cui ssh conserva le tue chiavi e gli host conosciuti, di solito .ssh nella tua cartella Inizio."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ssh が鍵と既知のホストを保存しているフォルダを選択してください。通常はホームフォルダ内の .ssh です。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ssh가 키와 알려진 호스트를 보관하는 폴더를 선택하세요. 보통 홈 폴더의 .ssh입니다."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wybierz folder, w którym ssh przechowuje klucze i znane hosty, zwykle .ssh w folderze domowym."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Escolha a pasta onde o ssh guarda suas chaves e hosts conhecidos, geralmente .ssh na sua pasta de início."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Выберите папку, в которой ssh хранит ваши ключи и известные хосты, обычно .ssh в вашей домашней папке."
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "เลือกโฟลเดอร์ที่ ssh ใช้เก็บคีย์และโฮสต์ที่รู้จักของคุณ ซึ่งปกติคือ .ssh ในโฟลเดอร์โฮมของคุณ"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anahtarlarınızın ve bilinen sunucuların ssh tarafından tutulduğu klasörü seçin; genellikle ev klasörünüzdeki .ssh klasörüdür."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chọn thư mục nơi ssh lưu khóa và các máy chủ đã biết của bạn, thường là .ssh trong thư mục người dùng của bạn."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请选择 ssh 存放你的密钥和已知主机的文件夹，通常是个人文件夹中的 .ssh。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "請選擇 ssh 存放你的金鑰與已知主機的檔案夾，通常是個人專屬檔案夾中的 .ssh。"
+          }
+        }
+      }
+    },
+    "Choose your SSH folder first: ssh can only use the keys and known hosts in a folder you choose.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "اختر مجلد SSH أولًا: لا يمكن لـ ssh أن يستخدم إلا المفاتيح والمضيفين المعروفين في مجلد تختاره."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wählen Sie zuerst Ihren SSH-Ordner aus: ssh kann nur die Schlüssel und bekannten Hosts in einem von Ihnen ausgewählten Ordner verwenden."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Primero selecciona tu carpeta SSH: ssh solo puede usar las claves y los servidores conocidos de una carpeta que selecciones."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choisissez d'abord votre dossier SSH : ssh ne peut utiliser que les clés et les hôtes connus d'un dossier que vous choisissez."
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "पहले अपना SSH फ़ोल्डर चुनें: ssh केवल उसी फ़ोल्डर की कुंजियों और ज्ञात होस्ट का उपयोग कर सकता है जिसे आप चुनें।"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pilih folder SSH Anda terlebih dahulu: ssh hanya dapat menggunakan kunci dan host yang dikenal di folder yang Anda pilih."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scegli prima la tua cartella SSH: ssh può usare solo le chiavi e gli host conosciuti di una cartella scelta da te."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "先に SSH フォルダを選択してください。ssh は、選択したフォルダ内の鍵と既知のホストしか使用できません。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "먼저 SSH 폴더를 선택하세요. ssh는 직접 선택한 폴더에 있는 키와 알려진 호스트만 사용할 수 있습니다."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Najpierw wybierz folder SSH: ssh może używać tylko kluczy i znanych hostów z folderu, który wybierzesz."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Escolha primeiro sua pasta SSH: o ssh só pode usar as chaves e os hosts conhecidos de uma pasta escolhida por você."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Сначала выберите папку SSH: ssh может использовать только ключи и известные хосты из выбранной вами папки."
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "โปรดเลือกโฟลเดอร์ SSH ก่อน เพราะ ssh ใช้ได้เฉพาะคีย์และโฮสต์ที่รู้จักในโฟลเดอร์ที่คุณเลือกเท่านั้น"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Önce SSH klasörünüzü seçin: ssh yalnızca sizin seçtiğiniz bir klasördeki anahtarları ve bilinen sunucuları kullanabilir."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hãy chọn thư mục SSH của bạn trước: ssh chỉ có thể dùng khóa và các máy chủ đã biết trong thư mục do bạn chọn."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请先选择你的 SSH 文件夹：ssh 只能使用你所选文件夹中的密钥和已知主机。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "請先選擇你的 SSH 檔案夾：ssh 只能使用你所選檔案夾中的金鑰與已知主機。"
+          }
+        }
+      }
+    },
     "Choose…": {
       "extractionState": "manual",
       "localizations": {
@@ -24576,6 +24790,113 @@
         }
       }
     },
+    "Not chosen — ssh can only use a folder you choose": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "لم يتم الاختيار — لا يمكن لـ ssh أن يستخدم إلا مجلدًا تختاره"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nicht ausgewählt — ssh kann nur einen Ordner nutzen, den Sie auswählen"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No seleccionada — ssh solo puede usar una carpeta que selecciones"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aucun dossier choisi — ssh ne peut utiliser qu'un dossier que vous choisissez"
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "नहीं चुना गया — ssh केवल उसी फ़ोल्डर का उपयोग कर सकता है जिसे आप चुनें"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Belum dipilih — ssh hanya dapat menggunakan folder yang Anda pilih"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non scelta — ssh può usare solo una cartella scelta da te"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未選択 — ssh は選択したフォルダしか使用できません"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "선택 안 됨 — ssh는 직접 선택한 폴더만 사용할 수 있습니다"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nie wybrano — ssh może używać tylko folderu, który wybierzesz"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Não escolhida — o ssh só pode usar uma pasta escolhida por você"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Не выбрана — ssh может использовать только выбранную вами папку"
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ยังไม่ได้เลือก — ssh ใช้ได้เฉพาะโฟลเดอร์ที่คุณเลือกเท่านั้น"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Seçilmedi — ssh yalnızca sizin seçtiğiniz bir klasörü kullanabilir"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chưa chọn — ssh chỉ có thể dùng thư mục do bạn chọn"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未选择 — ssh 只能使用你选择的文件夹"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未選擇 — ssh 只能使用你選擇的檔案夾"
+          }
+        }
+      }
+    },
     "Not connected to a database.": {
       "extractionState": "manual",
       "localizations": {
@@ -31004,6 +31325,113 @@
           "stringUnit": {
             "state": "translated",
             "value": "SSH"
+          }
+        }
+      }
+    },
+    "SSH Folder": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "مجلد SSH"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "SSH-Ordner"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Carpeta SSH"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dossier SSH"
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "SSH फ़ोल्डर"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Folder SSH"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cartella SSH"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "SSH フォルダ"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "SSH 폴더"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Folder SSH"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pasta SSH"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Папка SSH"
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "โฟลเดอร์ SSH"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "SSH Klasörü"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Thư mục SSH"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "SSH 文件夹"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "SSH 檔案夾"
           }
         }
       }
