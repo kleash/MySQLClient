@@ -8,9 +8,11 @@ import NIOCore
 /// the same convention `showCreateView`/`showCreateRoutine` already use)
 /// followed by one `INSERT INTO` statement per row.
 enum SQLExporter {
-    /// `` `name` ``, with any backtick inside doubled.
+    /// `` `name` ``, with any backtick inside doubled. Compared literally, as
+    /// in `escapeStringLiteral`: a backtick followed by a combining mark is
+    /// still a backtick.
     static func quoted(_ name: String) -> String {
-        "`" + name.replacingOccurrences(of: "`", with: "``") + "`"
+        "`" + name.replacingOccurrences(of: "`", with: "``", options: .literal) + "`"
     }
 
     /// Swaps the leading `CREATE TABLE` for `CREATE TABLE IF NOT EXISTS` and
@@ -83,13 +85,17 @@ enum SQLExporter {
     /// `\Z`, the way mysqldump writes them: the `mysql` client refuses a raw
     /// NUL in a script, and a value with its own line breaks would otherwise
     /// spread one statement over many lines of the file.
+    ///
+    /// Compared literally, character code by character code: by default a
+    /// quote followed by a combining mark (U+0301) counts as one character
+    /// that isn't a quote, and would end the literal early.
     static func escapeStringLiteral(_ raw: String) -> String {
-        raw.replacingOccurrences(of: "\\", with: "\\\\")
-            .replacingOccurrences(of: "'", with: "''")
-            .replacingOccurrences(of: "\0", with: "\\0")
-            .replacingOccurrences(of: "\n", with: "\\n")
-            .replacingOccurrences(of: "\r", with: "\\r")
-            .replacingOccurrences(of: "\u{1A}", with: "\\Z")
+        raw.replacingOccurrences(of: "\\", with: "\\\\", options: .literal)
+            .replacingOccurrences(of: "'", with: "''", options: .literal)
+            .replacingOccurrences(of: "\0", with: "\\0", options: .literal)
+            .replacingOccurrences(of: "\n", with: "\\n", options: .literal)
+            .replacingOccurrences(of: "\r", with: "\\r", options: .literal)
+            .replacingOccurrences(of: "\u{1A}", with: "\\Z", options: .literal)
     }
 
     /// One value as the server sent it over the text protocol

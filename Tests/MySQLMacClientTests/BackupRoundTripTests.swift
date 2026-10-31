@@ -163,7 +163,7 @@ final class BackupRoundTripTests: XCTestCase {
             """).rows
         for object in objects {
             let name = try XCTUnwrap(object.column("name")?.string)
-            let quoted = "`\(database)`.`\(name.replacingOccurrences(of: "`", with: "``"))`"
+            let quoted = "`\(database)`.`\(name.replacingOccurrences(of: "`", with: "``", options: .literal))`"
             if object.column("type")?.string == "VIEW" {
                 result["view \(name)"] = try await showCreate("SHOW CREATE VIEW \(quoted)")
                 continue
@@ -327,6 +327,17 @@ final class BackupRoundTripTests: XCTestCase {
         "INSERT INTO fractional_key VALUES " + (1...20).map { "('2024-01-01 00:00:00.\(String(format: "%06d", $0))', \($0))" }.joined(separator: ", "),
         "CREATE TABLE decimal_key (k DECIMAL(30,20) PRIMARY KEY, v INT)",
         "INSERT INTO decimal_key VALUES " + (1...20).map { "(1.\(String(format: "%020d", $0)), \($0))" }.joined(separator: ", "),
+
+        // ---- Values and paging, continued ----
+
+        // A combining mark right after a quote, a backslash or a backtick,
+        // which an escape has to see as two characters.
+        "CREATE TABLE combining_marks (id INT PRIMARY KEY, v VARCHAR(20))",
+        "INSERT INTO combining_marks VALUES (1, 'd\u{336}o\u{336}n\u{336}''\u{336}t\u{336}'), (2, 'x\\\\\u{301}y')",
+        "CREATE TABLE `tick``\u{301}mark` (id INT PRIMARY KEY)",
+        "INSERT INTO `tick``\u{301}mark` VALUES (1)",
+
+        // ---- End of values and paging, continued ----
 
         // Names that need quoting.
         "CREATE TABLE `select` (`from` INT PRIMARY KEY, `order` VARCHAR(5))",

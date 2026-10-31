@@ -34,6 +34,20 @@ final class SQLExporterTests: XCTestCase {
         XCTAssertEqual(SQLExporter.escapeStringLiteral("a\0b\u{1A}c\r\nd"), "a\\0b\\Zc\\r\\nd")
     }
 
+    /// A combining mark makes one Character of itself and the character
+    /// before it, so a replace that compares Characters would leave a quote,
+    /// backslash or backtick followed by one unescaped.
+    func testEscapingStillAppliesBeforeACombiningMark() {
+        let mark = "\u{301}"
+        XCTAssertEqual(SQLExporter.escapeStringLiteral("x'\(mark)y"), "x''\(mark)y")
+        XCTAssertEqual(SQLExporter.escapeStringLiteral("x\\\(mark)y"), "x\\\\\(mark)y")
+        XCTAssertEqual(
+            SQLExporter.escapeStringLiteral("\0\(mark)\n\(mark)\r\(mark)\u{1A}\(mark)"),
+            "\\0\(mark)\\n\(mark)\\r\(mark)\\Z\(mark)"
+        )
+        XCTAssertEqual(SQLExporter.quoted("a`\(mark)b"), "`a``\(mark)b`")
+    }
+
     func testBlobRendersAsHexLiteral() {
         let sql = SQLExporter.insertStatement(database: "db", table: "t", columns: [columns[0]], values: [.blob(Data([0x00, 0xFF]))])
         XCTAssertEqual(sql, "INSERT INTO `db`.`t` (`id`) VALUES (X'00ff');")
