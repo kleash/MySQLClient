@@ -144,6 +144,7 @@ final class DatabaseBackupViewModel: ObservableObject {
     private var totalUnits = 0
     private var unitsBeforeCurrentObject = 0
     private var savedSessionSettings: (timeZone: String, sqlMode: String)?
+    private var wroteViewStandIns = false
 
     init(service: MySQLService, database: DatabaseInfo) {
         self.service = service
@@ -333,6 +334,7 @@ final class DatabaseBackupViewModel: ObservableObject {
         let weights = await unitWeights(for: objects)
         totalUnits = weights.reduce(0, +)
         unitsBeforeCurrentObject = 0
+        wroteViewStandIns = false
         progress = Progress(
             completedObjects: 0, totalObjects: objects.count,
             completedUnits: 0, totalUnits: totalUnits,
@@ -391,7 +393,8 @@ final class DatabaseBackupViewModel: ObservableObject {
     /// and is safe because `FOREIGN_KEY_CHECKS=0` is on by default,
     /// matching real `mysqldump`'s own behavior). Views after all tables —
     /// `CREATE VIEW` genuinely requires its underlying tables to exist,
-    /// unlike a constraint that's just disabled by a flag. Then routines,
+    /// unlike a constraint that's just disabled by a flag — and after a
+    /// stand-in for each view (`writeViewStandIns`). Then routines,
     /// then triggers — after every table's rows, as mysqldump does, so
     /// restoring the rows doesn't fire them (an audit trigger would write
     /// its rows a second time) — in the order they fire, and events last.
@@ -530,6 +533,10 @@ final class DatabaseBackupViewModel: ObservableObject {
         case .table(let table):
             try await dumpTable(table, to: fileHandle)
         case .view(let view):
+            if !wroteViewStandIns, options.mode != .dataOnly {
+                wroteViewStandIns = true
+                try await writeViewStandIns(to: fileHandle)
+            }
             try await dumpView(view, to: fileHandle)
         case .procedure(let routine), .function(let routine):
             try await dumpRoutine(routine, to: fileHandle)
@@ -682,6 +689,19 @@ final class DatabaseBackupViewModel: ObservableObject {
         guard wroteAnyRows else { return }
         if options.file.lockInsertStatements {
             fileHandle.write(Data("UNLOCK TABLES;\n".utf8))
+        }
+        fileHandle.write(Data("\n".utf8))
+    }
+
+    /// Before the first view, every selected view is created as a stand-in
+    /// with the same column names, as mysqldump does: a view can be built
+    /// on another view that sorts after it, which has to exist by the time
+    /// it's created. Each real definition then replaces its stand-in.
+    private func writeViewStandIns(to fileHandle: FileHandle) async throws {
+        for view in selectedViews.sorted(by: { $0.name < $1.name }) {
+            let columns = try await introspection.columns(forTable: view.name, inDatabase: database.name)
+            let selectList = columns.map { "1 AS \(SQLExporter.quoted($0.name))" }.joined(separator: ", ")
+            fileHandle.write(Data("CREATE OR REPLACE VIEW \(SQLExporter.quoted(view.name)) AS SELECT \(selectList);\n".utf8))
         }
         fileHandle.write(Data("\n".utf8))
     }

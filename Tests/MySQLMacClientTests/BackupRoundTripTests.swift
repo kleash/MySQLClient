@@ -294,6 +294,10 @@ final class BackupRoundTripTests: XCTestCase {
         // server keeps them with it, and ANSI_QUOTES makes "x" a name) and
         // a connection collation that isn't the server's default.
         "CREATE VIEW positive_checks AS SELECT id, qty FROM checked WHERE qty > 0",
+        // A view built on a view that sorts after it.
+        "CREATE VIEW z_base_view AS SELECT id, a FROM computed",
+        "CREATE VIEW a_view_on_view AS SELECT id FROM z_base_view WHERE a > 0",
+        "CREATE SQL SECURITY INVOKER VIEW invoker_view AS SELECT id FROM numbers",
         "SET SESSION sql_mode = 'ANSI_QUOTES,PIPES_AS_CONCAT', collation_connection = 'utf8mb4_unicode_ci'",
         """
         CREATE FUNCTION label_of(p INT) RETURNS VARCHAR(40) DETERMINISTIC
