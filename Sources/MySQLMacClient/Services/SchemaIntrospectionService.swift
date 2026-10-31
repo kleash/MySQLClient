@@ -107,8 +107,8 @@ struct SchemaIntrospectionService {
     /// sitting in `database`'s context). MySQL always fully qualifies every
     /// reference with the queried name when the view identifier itself was
     /// qualified, so the leading `` `database`. `` is stripped back out
-    /// afterward to match what a `USE database; SHOW CREATE VIEW` would
-    /// have produced.
+    /// afterward (`unqualified`) to match what a `USE database; SHOW CREATE
+    /// VIEW` would have produced.
     func showCreateView(_ view: String, inDatabase database: String) async throws -> String {
         try await viewDefinition(view, inDatabase: database).statement
     }
@@ -121,22 +121,36 @@ struct SchemaIntrospectionService {
         guard let row = rows.first, let raw = row.column("Create View")?.string else {
             throw MySQLServiceError.invalidIdentifier(view)
         }
-        let qualifiedPrefix = "\(try Self.quotedIdentifier(database))."
-        return (raw.replacingOccurrences(of: qualifiedPrefix, with: ""), row.column("collation_connection")?.string ?? "")
+        return (Self.unqualified(raw, database: database), row.column("collation_connection")?.string ?? "")
     }
 
     /// The table's `CREATE TABLE` statement, exactly as MySQL would print it
     /// from `SHOW CREATE TABLE table_name` — the schema half of the SQL
-    /// export format (`SQLExporter`). Same schema-qualifier-stripping
-    /// rationale as `showCreateView` above.
+    /// export format (`SQLExporter`). It names its own database only where a
+    /// DEFAULT takes numbers from a MariaDB sequence, whichever database is
+    /// current (`` nextval(`db`.`seq`) ``), and that comes out the same way
+    /// as in `showCreateView`.
     func showCreateTable(_ table: String, inDatabase database: String) async throws -> String {
         let qualifiedTable = try Self.qualifiedIdentifier(database: database, name: table)
         let rows = try await service.query("SHOW CREATE TABLE \(qualifiedTable)")
         guard let raw = rows.first?.column("Create Table")?.string else {
             throw MySQLServiceError.invalidIdentifier(table)
         }
-        let qualifiedPrefix = "\(try Self.quotedIdentifier(database))."
-        return raw.replacingOccurrences(of: qualifiedPrefix, with: "")
+        return Self.unqualified(raw, database: database)
+    }
+
+    /// `statement` without `` `database`. `` in front of the names it
+    /// qualifies. Strings and quoted names are matched whole, so the same
+    /// text inside a string (`'see `shop`.t'`, a comment or a default) or
+    /// further along another name (`` `other`.`shop`.`t` ``) stays as it is.
+    static func unqualified(_ statement: String, database: String) -> String {
+        let qualifier = SQLExporter.quoted(database) + "."
+        // A string in single or double quotes, or a quoted name with the
+        // names that follow it after dots.
+        let token = #/'(?:[^'\\]|\\.|'')*'|"(?:[^"\\]|\\.|"")*"|`(?:[^`]|``)*`(?:\.`(?:[^`]|``)*`)*/#
+        return statement.replacing(token) { match in
+            match.output.hasPrefix(qualifier) ? match.output.dropFirst(qualifier.count) : match.output
+        }
     }
 
     /// `SHOW CREATE DATABASE`: the database with its default character set

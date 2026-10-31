@@ -546,6 +546,15 @@ final class BackupRoundTripTests: XCTestCase {
         "SET NAMES utf8mb4 COLLATE utf8mb4_bin",
         "CREATE VIEW binary_literals AS SELECT 'a' = 'A' AS same",
         "SET NAMES utf8mb4",
+        // The database's quoted name and a dot inside string literals: only
+        // a name it qualifies may lose it.
+        """
+        CREATE TABLE mentions_database (
+            id INT PRIMARY KEY,
+            note VARCHAR(80) DEFAULT 'copied from `mysqlmacclient_roundtrip`.t' COMMENT 'see `mysqlmacclient_roundtrip`.t'
+        ) COMMENT = 'archive of `mysqlmacclient_roundtrip`.orders'
+        """,
+        "CREATE VIEW mentions_database_view AS SELECT 'see `mysqlmacclient_roundtrip`.t for it''s details' AS note",
     ]
 
     /// MariaDB-only, after `mariaDBCorpus`.

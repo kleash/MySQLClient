@@ -274,6 +274,21 @@ final class SchemaIntrospectionServiceTests: XCTestCase {
         _ = try await service.rawQuery("DROP EVENT IF EXISTS introspection_test_event")
     }
 
+    /// Only a name the database qualifies loses it: not the same text in a
+    /// string, nor a later part of a name in another database.
+    func testUnqualifiedDropsTheDatabaseOnlyWhereItQualifiesAName() {
+        func unqualified(_ statement: String) -> String {
+            SchemaIntrospectionService.unqualified(statement, database: "shop")
+        }
+        XCTAssertEqual(unqualified("select `shop`.`t`.`id` AS `id` from `shop`.`t`"), "select `t`.`id` AS `id` from `t`")
+        XCTAssertEqual(unqualified("DEFAULT nextval(`shop`.`seq`)"), "DEFAULT nextval(`seq`)")
+        XCTAssertEqual(unqualified(#"select 'see `shop`.t for it\'s details' AS `note`"#), #"select 'see `shop`.t for it\'s details' AS `note`"#)
+        XCTAssertEqual(unqualified("COMMENT 'it''s `shop`.t', `shop`.`u`"), "COMMENT 'it''s `shop`.t', `u`")
+        XCTAssertEqual(unqualified("from `other`.`shop` join `other`.`shop`.`c`"), "from `other`.`shop` join `other`.`shop`.`c`")
+        XCTAssertEqual(unqualified("from `a``shop`.`t`"), "from `a``shop`.`t`")
+        XCTAssertEqual(SchemaIntrospectionService.unqualified("from `odd``db`.`t`", database: "odd`db"), "from `t`")
+    }
+
     func testQuotedIdentifierDoublesBackticks() throws {
         XCTAssertEqual(try SchemaIntrospectionService.quotedIdentifier("evil`table"), "`evil``table`")
         XCTAssertEqual(try SchemaIntrospectionService.quotedIdentifier("x` ; DROP TABLE t; --"), "`x`` ; DROP TABLE t; --`")
