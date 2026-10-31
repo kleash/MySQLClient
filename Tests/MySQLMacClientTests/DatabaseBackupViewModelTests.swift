@@ -511,6 +511,28 @@ final class DatabaseBackupViewModelTests: XCTestCase {
         XCTAssertFalse(viewModel.didFinishSuccessfully, "iptal edilen bir yedekleme tamamlanma uyarısını tetiklememeli")
     }
 
+    /// Locking tables, a trigger whose table isn't backed up is still read:
+    /// its definition doesn't need the table locked.
+    func testLockingTablesBacksUpATriggerWithoutItsTable() async throws {
+        let scratch = try await makeScratchDatabase("mysqlmacclient_backup_locktrigger", [
+            "CREATE TABLE t (id INT PRIMARY KEY)",
+            "CREATE TABLE u (id INT PRIMARY KEY)",
+            "CREATE TRIGGER t_bi BEFORE INSERT ON t FOR EACH ROW SET NEW.id = NEW.id",
+        ])
+        let viewModel = DatabaseBackupViewModel(service: service, database: scratch)
+        await viewModel.loadDatabasesAndObjects()
+        viewModel.selectedTables = Set(viewModel.allTables.filter { $0.name == "u" })
+        viewModel.options.source.lockTablesForReading = true
+        viewModel.outputFileURL = tempFileURL
+        viewModel.outputLocationIsGranted = true
+
+        viewModel.startBackup()
+        while viewModel.isRunning { await Task.yield() }
+
+        XCTAssertNil(viewModel.errorMessage)
+        XCTAssertTrue(try String(contentsOf: tempFileURL, encoding: .utf8).contains("TRIGGER `t_bi`"))
+    }
+
     /// Cancelled before it has counted every table's rows, the backup stops
     /// counting: on a big database each COUNT(*) reads a whole table on the
     /// server.
