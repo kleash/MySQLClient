@@ -533,6 +533,14 @@ final class BackupRoundTripTests: XCTestCase {
         // template writes one: a copy must get it, not the original a
         // second one.
         "CREATE TRIGGER `mysqlmacclient_roundtrip`.`qualified_trigger` AFTER UPDATE ON `mysqlmacclient_roundtrip`.`audited` FOR EACH ROW SET @audited_updates = 1",
+        // A function, a trigger and an event created while the database's
+        // default was latin1 keep it, and their parameters and variables
+        // declared without a character set are latin1.
+        "ALTER DATABASE CHARACTER SET latin1",
+        "CREATE FUNCTION latin1_length(p VARCHAR(10)) RETURNS INT DETERMINISTIC RETURN LENGTH(p)",
+        "CREATE TRIGGER latin1_trigger AFTER INSERT ON checked FOR EACH ROW SET @latin1_trigger = 1",
+        "CREATE EVENT latin1_event ON SCHEDULE EVERY 1 DAY STARTS '2030-01-01 00:00:00' DISABLE DO SET @latin1_event = 1",
+        "ALTER DATABASE CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci",
     ]
 
     /// MariaDB-only, after `mariaDBCorpus`.

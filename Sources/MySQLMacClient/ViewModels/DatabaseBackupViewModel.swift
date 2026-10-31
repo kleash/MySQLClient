@@ -155,6 +155,9 @@ final class DatabaseBackupViewModel: ObservableObject {
     private var totalUnits = 0
     private var unitsBeforeCurrentObject = 0
     private var wroteViewStandIns = false
+    /// The database's default collation, read as a run begins — see
+    /// `creationStatement`.
+    private var databaseCollation = ""
 
     init(service: MySQLService, database: DatabaseInfo) {
         self.service = service
@@ -371,6 +374,10 @@ final class DatabaseBackupViewModel: ObservableObject {
             // `ANSI_QUOTES` change how `SHOW CREATE` writes a statement. The
             // file declares the same time zone (`writeHeader`).
             _ = try await connection.textQuery("SET SESSION time_zone = '+00:00', sql_mode = ''")
+            databaseCollation = try await connection.textQuery("""
+                SELECT DEFAULT_COLLATION_NAME AS collation FROM information_schema.SCHEMATA
+                WHERE SCHEMA_NAME = '\(SQLExporter.escapeStringLiteral(database.name))'
+                """).first?.column("collation")?.string ?? ""
             let objects = try await buildObjectPlan()
             let weights = await unitWeights(for: objects)
             totalUnits = weights.reduce(0, +)
@@ -835,8 +842,7 @@ final class DatabaseBackupViewModel: ObservableObject {
             fileHandle.write(Data((SQLExporter.dropRoutineStatement(routine) + "\n").utf8))
         }
         let definition = try await introspection.routineDefinition(routine)
-        let wrapped = SQLExporter.delimiterWrappedRoutineStatement(rawShowCreateRoutine: definition.statement)
-        fileHandle.write(Data((SQLExporter.underCreationSettings(wrapped, definition.settings) + "\n\n").utf8))
+        fileHandle.write(Data((creationStatement(definition) + "\n\n").utf8))
     }
 
     private func dumpTrigger(_ trigger: TriggerInfo, to fileHandle: FileHandle) async throws {
@@ -845,8 +851,7 @@ final class DatabaseBackupViewModel: ObservableObject {
             fileHandle.write(Data((SQLExporter.dropTriggerStatement(trigger) + "\n").utf8))
         }
         let definition = try await introspection.triggerDefinition(trigger)
-        let wrapped = SQLExporter.delimiterWrappedRoutineStatement(rawShowCreateRoutine: definition.statement)
-        fileHandle.write(Data((SQLExporter.underCreationSettings(wrapped, definition.settings) + "\n\n").utf8))
+        fileHandle.write(Data((creationStatement(definition) + "\n\n").utf8))
     }
 
     private func dumpEvent(_ event: EventInfo, to fileHandle: FileHandle) async throws {
@@ -855,8 +860,26 @@ final class DatabaseBackupViewModel: ObservableObject {
             fileHandle.write(Data((SQLExporter.dropEventStatement(event) + "\n").utf8))
         }
         let definition = try await introspection.eventDefinition(event)
-        let wrapped = SQLExporter.delimiterWrappedRoutineStatement(rawShowCreateRoutine: definition.statement)
-        fileHandle.write(Data((SQLExporter.underCreationSettings(wrapped, definition.settings) + "\n\n").utf8))
+        fileHandle.write(Data((creationStatement(definition) + "\n\n").utf8))
+    }
+
+    /// A routine, trigger or event's CREATE under the settings it was
+    /// created with (`SQLExporter.underCreationSettings`). One created while
+    /// the database's default collation was another, which gave the
+    /// parameters and variables it declares without a character set theirs,
+    /// is also created under that default, as mysqldump does, and the
+    /// database's own put back after: a database the file is restored into
+    /// ends up with this one's.
+    private func creationStatement(_ definition: (statement: String, settings: SchemaIntrospectionService.CreationSettings)) -> String {
+        let statement = SQLExporter.underCreationSettings(
+            SQLExporter.delimiterWrappedRoutineStatement(rawShowCreateRoutine: definition.statement),
+            definition.settings
+        )
+        guard let collation = definition.settings.databaseCollation, !databaseCollation.isEmpty, collation != databaseCollation else {
+            return statement
+        }
+        return "ALTER DATABASE COLLATE '\(SQLExporter.escapeStringLiteral(collation))';\n\(statement)\n"
+            + "ALTER DATABASE COLLATE '\(SQLExporter.escapeStringLiteral(databaseCollation))';"
     }
 
     private func describe(_ error: Error) -> String {

@@ -179,6 +179,9 @@ struct SchemaIntrospectionService {
         let collationConnection: String
         /// Events only: the time zone their schedule is in.
         var timeZone: String? = nil
+        /// The database's default collation when it was created, which its
+        /// parameters and variables declared without a character set take.
+        var databaseCollation: String? = nil
     }
 
     /// `showCreateRoutine`, with the settings the routine was created under.
@@ -191,14 +194,15 @@ struct SchemaIntrospectionService {
         return (raw, Self.creationSettings(of: row))
     }
 
-    /// The `sql_mode` and `collation_connection` columns every `SHOW CREATE
-    /// PROCEDURE/FUNCTION/TRIGGER/EVENT` row carries, and an event's
-    /// `time_zone`.
+    /// The `sql_mode`, `collation_connection` and `Database Collation`
+    /// columns every `SHOW CREATE PROCEDURE/FUNCTION/EVENT` and `SHOW
+    /// TRIGGERS` row carries, and an event's `time_zone`.
     static func creationSettings(of row: MySQLRow) -> CreationSettings {
         CreationSettings(
             sqlMode: row.column("sql_mode")?.string ?? "",
             collationConnection: row.column("collation_connection")?.string ?? "",
-            timeZone: row.column("time_zone")?.string
+            timeZone: row.column("time_zone")?.string,
+            databaseCollation: row.column("Database Collation")?.string
         )
     }
 
