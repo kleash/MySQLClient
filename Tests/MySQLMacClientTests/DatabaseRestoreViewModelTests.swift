@@ -176,6 +176,22 @@ final class DatabaseRestoreViewModelTests: XCTestCase {
         XCTAssertEqual(rows, [#"/* c  d */|C:\dir\file"#, "/* x */|new"])
     }
 
+    /// A `use db` line without a semicolon is a command of its own to the
+    /// MariaDB client. Read as the start of the next statement, it was
+    /// skipped along with that statement, and the row never restored.
+    func testRunsTheStatementAfterAUseLineWithoutASemicolon() async throws {
+        let viewModel = try await restore(Data("""
+            CREATE TABLE settings (id INT PRIMARY KEY, v VARCHAR(5));
+            use shop
+            INSERT INTO settings VALUES (1, 'x');
+            INSERT INTO settings VALUES (2, 'y');
+            """.utf8))
+
+        XCTAssertNil(viewModel.errorMessage)
+        let restored = try await ids(in: "settings")
+        XCTAssertEqual(restored, [1, 2])
+    }
+
     /// Restoring into a chosen database, the file can't switch away from
     /// it, create or drop the database it was made from.
     func testSkipsTheFilesOwnDatabaseStatementsWhenRestoringIntoAnother() async throws {

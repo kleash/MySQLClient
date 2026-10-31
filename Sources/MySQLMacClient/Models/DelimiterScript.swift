@@ -33,7 +33,7 @@ enum DelimiterScript {
     /// `statements(from:)` opts in on.
     static func containsDelimiterDirective(_ script: String) -> Bool {
         // `[ \t]`, not `\s` — this must only match a directive that's
-        // complete on one line, matching `delimiterDirective`'s per-line
+        // complete on one line, matching `commandLine`'s per-line
         // check below (`\s` would let the token match across a newline,
         // e.g. treating a stray "DELIMITER" line as directive by borrowing
         // the next line's first word as its token).
@@ -169,13 +169,26 @@ enum DelimiterScript {
         scanning: while index < count {
             if isAtLineStart {
                 isAtLineStart = false
-                if let directive = delimiterDirective(in: bytes, lineStart: index) {
+                if let directive = commandLine("delimiter", in: bytes, lineStart: index) {
                     // Without its line break, the line may go on in bytes
                     // not read yet (`DELIMITER $` of `DELIMITER $$`).
                     if !isFinal, directive.lineEnd == count { break scanning }
                     endStatement(at: index)
-                    delimiter = directive.delimiter
+                    delimiter = directive.argument
                     index = directive.lineEnd
+                    boundary = (index, stateHere())
+                    if stopped { break scanning }
+                    continue
+                }
+                // The MariaDB client (and the mysql client with --commands)
+                // runs a `use` line that has no delimiter on its own, when
+                // no statement has started yet.
+                if statementStart == nil, let use = commandLine("use", in: bytes, lineStart: index),
+                   !bytes[index..<use.lineEnd].contains(delimiter) {
+                    if !isFinal, use.lineEnd == count { break scanning }
+                    statementStart = (index, line)
+                    endStatement(at: use.lineEnd)
+                    index = use.lineEnd
                     boundary = (index, stateHere())
                     if stopped { break scanning }
                     continue
@@ -308,13 +321,15 @@ enum DelimiterScript {
         }
     }
 
-    /// `"DELIMITER $$"` → `$$`, `"delimiter ;"` → `;`, along with where
-    /// that line ends. Requires a token after the keyword — a bare
-    /// `"DELIMITER"` isn't a directive this can act on, so it's left for
-    /// the surrounding statement to carry (harmlessly, as ordinary text).
-    /// Only ever asked about a line that starts outside a string or
-    /// comment, so a `DELIMITER` line quoted inside one is left alone.
-    private static func delimiterDirective(in bytes: [UInt8], lineStart: Int) -> (delimiter: [UInt8], lineEnd: Int)? {
+    /// A line that holds one of the mysql client's own commands: for
+    /// `"delimiter"`, `"DELIMITER $$"` → `$$`, `"delimiter ;"` → `;`,
+    /// along with where that line ends. Requires a token after the
+    /// keyword — a bare `"DELIMITER"` isn't a directive this can act on,
+    /// so it's left for the surrounding statement to carry (harmlessly,
+    /// as ordinary text). Only ever asked about a line that starts outside
+    /// a string or comment, so a `DELIMITER` line quoted inside one is
+    /// left alone.
+    private static func commandLine(_ command: String, in bytes: [UInt8], lineStart: Int) -> (argument: [UInt8], lineEnd: Int)? {
         let count = bytes.count
         func isBlank(_ offset: Int) -> Bool {
             bytes[offset] == UInt8(ascii: " ") || bytes[offset] == UInt8(ascii: "\t")
@@ -322,7 +337,7 @@ enum DelimiterScript {
 
         var index = lineStart
         while index < count, isBlank(index) { index += 1 }
-        for letter in "delimiter".utf8 {
+        for letter in command.utf8 {
             // `| 0x20` lowercases an ASCII letter.
             guard index < count, bytes[index] | 0x20 == letter else { return nil }
             index += 1

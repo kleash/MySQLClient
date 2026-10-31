@@ -208,6 +208,22 @@ final class DelimiterScriptTests: XCTestCase {
         ])
     }
 
+    /// `use <db>` alone on a line, with no delimiter, before a statement has
+    /// started, is a command of its own to the MariaDB client (and to the
+    /// mysql client with --commands), not the start of a statement that
+    /// runs on into the next line.
+    func testAllStatementsEndsAUseLineThatHasNoDelimiter() {
+        let script = "use shop\nINSERT INTO t VALUES (1);\n  USE `shop` -- why\nSELECT 1,\nuse x\n, 2;\nuse shop; SELECT 3;"
+        XCTAssertEqual(DelimiterScript.allStatements(from: script), [
+            "use shop",
+            "INSERT INTO t VALUES (1)",
+            "USE `shop` -- why",
+            "SELECT 1,\nuse x\n, 2",
+            "use shop",
+            "SELECT 3",
+        ])
+    }
+
     /// `--` needs whitespace after it to be a comment, exactly as in
     /// MySQL — otherwise it's a double negation.
     func testAllStatementsTreatsDoubleDashWithoutSpaceAsArithmetic() {
@@ -286,14 +302,15 @@ final class DelimiterScriptTests: XCTestCase {
     /// Every chunk size from one byte up must give exactly the statements,
     /// and lines, of splitting the whole script at once: cuts inside
     /// strings, comments, executable comments, multi-byte characters, a
-    /// `DELIMITER` line and a two-character delimiter all have to come out
-    /// the same.
+    /// `DELIMITER` or `use` line and a two-character delimiter all have to
+    /// come out the same.
     func testSplitterMatchesTheWholeScriptAtEveryChunkSize() throws {
         let script = """
             SET NAMES utf8mb4; -- comment; with a semicolon
             INSERT INTO t VALUES ('a;b', 'it''s', 'back\\'slash; x', "dq;", `c;`), ('😀 ünï 中文;');
             # hash comment;
             /* block; comment */ SELECT 1 /*! executable; */; /*!50001 SELECT '*/;' */;\r
+            use db_x
             SELECT 5--3;
             DELIMITER $$
             CREATE PROCEDURE p()
@@ -305,7 +322,7 @@ final class DelimiterScriptTests: XCTestCase {
             SELECT 'unterminated last statement'
             """
         let expected = DelimiterScript.locatedStatements(from: script)
-        XCTAssertEqual(expected.count, 11)
+        XCTAssertEqual(expected.count, 12)
         let bytes = Array(script.utf8)
         for chunkSize in 1...bytes.count {
             var splitter = DelimiterScript.Splitter()
