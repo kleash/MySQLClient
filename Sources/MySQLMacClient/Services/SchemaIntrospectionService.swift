@@ -29,8 +29,8 @@ struct SchemaIntrospectionService {
                   let name = row.column(nameColumn)?.string else {
                 return nil
             }
-            let isView = row.column("Table_type")?.string == "VIEW"
-            return TableInfo(database: database, name: name, isView: isView)
+            let type = row.column("Table_type")?.string
+            return TableInfo(database: database, name: name, isView: type == "VIEW", isSequence: type == "SEQUENCE")
         }
     }
 

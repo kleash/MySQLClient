@@ -30,7 +30,9 @@ final class BackupRoundTripTests: XCTestCase {
         _ = try await service.rawQuery("CREATE DATABASE `\(database)` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci")
         _ = try await service.rawQuery("USE `\(database)`")
         let isMariaDB = await service.serverVersion?.contains("MariaDB") ?? false
-        for statement in Self.corpus + (isMariaDB ? Self.mariaDBCorpus : []) {
+        let fixtures = Self.corpus + Self.schemaObjectCorpus
+            + (isMariaDB ? Self.mariaDBCorpus + Self.mariaDBSchemaObjectCorpus : [])
+        for statement in fixtures {
             do {
                 _ = try await service.rawQuery(statement)
             } catch {
@@ -203,8 +205,11 @@ final class BackupRoundTripTests: XCTestCase {
             // utf8mb4 COLLATE utf8mb4_unicode_ci` where the original said
             // `COLLATE utf8mb4_unicode_ci`: the same thing, since a collation
             // names its character set, so only that spelling is evened out.
+            // MariaDB names the sequence a DEFAULT takes numbers from with
+            // its database, which is another one in a copy.
             result["table \(name)"] = try await showCreate("SHOW CREATE TABLE \(quoted)")
                 .replacingOccurrences(of: #"CHARACTER SET (\w+) COLLATE (\1_\w+)"#, with: "COLLATE $2", options: .regularExpression)
+                .replacingOccurrences(of: "nextval(`\(database)`.", with: "nextval(")
             let checksum = try await service.rawQuery("CHECKSUM TABLE \(quoted)").rows.first
             result["table \(name) checksum"] = checksum?.column("Checksum")?.string
             let count = try await service.rawQuery("SELECT COUNT(*) AS n FROM \(quoted)").rows.first
@@ -472,5 +477,24 @@ final class BackupRoundTripTests: XCTestCase {
         "CREATE SEQUENCE uncached START WITH 7 CACHE 0",
         "SELECT NEXTVAL(uncached)",
         "SELECT NEXTVAL(order_numbers), NEXTVAL(order_numbers)",
+    ]
+
+    // MARK: - Corpus: order and settings of schema objects
+
+    /// Runs after `corpus`, on MySQL and MariaDB alike: objects that only
+    /// restore when they're created in the right order, or under the
+    /// settings they were created under.
+    private static let schemaObjectCorpus: [String] = [
+        // A view calling a function: CREATE VIEW checks the function exists.
+        "CREATE VIEW uses_function AS SELECT id, doubled(qty) AS twice FROM checked",
+    ]
+
+    /// MariaDB-only, after `mariaDBCorpus`.
+    private static let mariaDBSchemaObjectCorpus: [String] = [
+        // A table taking its key from a sequence that sorts after it: CREATE
+        // TABLE checks the sequence exists.
+        "CREATE SEQUENCE z_ids",
+        "CREATE TABLE a_uses_sequence (id INT NOT NULL DEFAULT NEXT VALUE FOR z_ids PRIMARY KEY, v INT)",
+        "INSERT INTO a_uses_sequence (v) VALUES (1), (2)",
     ]
 }

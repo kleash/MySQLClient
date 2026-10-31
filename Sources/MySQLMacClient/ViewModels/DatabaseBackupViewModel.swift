@@ -436,20 +436,22 @@ final class DatabaseBackupViewModel: ObservableObject {
     /// Tables first, with CREATE+DATA interleaved per table (not two
     /// passes — this is what makes "one table = one progress tick" work,
     /// and is safe because `FOREIGN_KEY_CHECKS=0` is on by default,
-    /// matching real `mysqldump`'s own behavior). Views after all tables —
-    /// `CREATE VIEW` genuinely requires its underlying tables to exist,
-    /// unlike a constraint that's just disabled by a flag — and after a
-    /// stand-in for each view (`writeViewStandIns`). Then routines,
-    /// then triggers — after every table's rows, as mysqldump does, so
-    /// restoring the rows doesn't fire them (an audit trigger would write
-    /// its rows a second time) — in the order they fire, and events last.
-    /// Alphabetical otherwise, since a `Set` has no defined order and dump
-    /// output needs to be deterministic across runs.
+    /// matching real `mysqldump`'s own behavior), MariaDB sequences ahead of
+    /// them: CREATE TABLE checks that a sequence a DEFAULT takes numbers
+    /// from exists. Then routines, whose bodies aren't checked until they
+    /// run. Views after both — `CREATE VIEW` genuinely requires the tables
+    /// and functions it uses to exist, unlike a constraint that's just
+    /// disabled by a flag — and after a stand-in for each view
+    /// (`writeViewStandIns`). Then triggers — after every table's rows, as
+    /// mysqldump does, so restoring the rows doesn't fire them (an audit
+    /// trigger would write its rows a second time) — in the order they
+    /// fire, and events last. Alphabetical otherwise, since a `Set` has no
+    /// defined order and dump output needs to be deterministic across runs.
     private func buildObjectPlan() -> [BackupObject] {
-        selectedTables.sorted { $0.name < $1.name }.map { .table($0) }
-            + selectedViews.sorted { $0.name < $1.name }.map { .view($0) }
+        selectedTables.sorted { ($0.isSequence ? 0 : 1, $0.name) < ($1.isSequence ? 0 : 1, $1.name) }.map { .table($0) }
             + selectedProcedures.sorted { $0.name < $1.name }.map { .procedure($0) }
             + selectedFunctions.sorted { $0.name < $1.name }.map { .function($0) }
+            + selectedViews.sorted { $0.name < $1.name }.map { .view($0) }
             + allTriggers.filter(selectedTriggers.contains).map { .trigger($0) }
             + selectedEvents.sorted { $0.name < $1.name }.map { .event($0) }
     }
