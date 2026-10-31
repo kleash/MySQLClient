@@ -377,6 +377,11 @@ final class BackupRoundTripTests: XCTestCase {
         // (see testPagesOfACompositeKeyAreRangesOfItsIndex).
         "CREATE TABLE reversed_key (a INT, b INT, PRIMARY KEY (b, a))",
         "INSERT INTO reversed_key VALUES " + (0..<700).map { "(\($0 / 10), \($0 % 10))" }.joined(separator: ", "),
+        // Pages that start inside a run of one FLOAT, so the next page is
+        // asked for with an equality on it.
+        "CREATE TABLE inexact_composite_key (f FLOAT, at DATETIME(6), PRIMARY KEY (f, at))",
+        "INSERT INTO inexact_composite_key VALUES "
+            + (1...24).map { "(\(Double($0 % 3) + 0.1234567), '2024-01-01 00:00:00.\(String(format: "%06d", $0))')" }.joined(separator: ", "),
         // No key, and values the collation calls equal but whose bytes
         // differ: case, accents and trailing spaces.
         "CREATE TABLE no_key_ties (v VARCHAR(10))",
