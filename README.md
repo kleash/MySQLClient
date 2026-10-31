@@ -166,10 +166,14 @@ docker compose -f testenv/docker-compose.yml down   # stop the server
 
 The server listens on `127.0.0.1:43306` only, keeps its data in memory, and
 loads `testenv/fixtures.sql` (the `mysqlmacclient_test` schema) on start.
-To use a server of your own instead, load that file into it and run
-`swift test` with `MYSQL_TEST_HOST`, `MYSQL_TEST_PORT`, `MYSQL_TEST_USER`
-and `MYSQL_TEST_PASSWORD` set; without them the tests connect to
-`127.0.0.1:3306` as `root` with no password.
+To use a MariaDB server of your own instead (the schema uses MariaDB's Aria
+engine), load that file into it yourself, e.g.
+`mysql -u root -p < testenv/fixtures.sql`, and run
+`swift test --build-system native` with `MYSQL_TEST_HOST`,
+`MYSQL_TEST_PORT`, `MYSQL_TEST_USER` and `MYSQL_TEST_PASSWORD` set; without
+them the tests connect to `127.0.0.1:3306` as `root` with no password.
+`--build-system native` matters: SwiftPM 6.4's default build system fails
+on the app's String Catalog.
 
 `BackupRoundTripTests` backs a schema of edge cases up, drops it, restores
 the file, and checks that the server reports exactly the same tables,
