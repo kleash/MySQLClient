@@ -6,10 +6,11 @@ import XCTest
 /// Builds a schema of edge cases that dump tools are known to get wrong,
 /// backs it up with `DatabaseBackupViewModel`, drops it, replays the file,
 /// and compares a fingerprint of the server's own view of every object
-/// before and after: `SHOW CREATE` output for each table, view, trigger,
-/// routine and event, plus `CHECKSUM TABLE` and the row count of every
-/// table. The fingerprint never goes through the backup code, so a value
-/// that comes back different is caught even when the dump "looks" right.
+/// before and after: `SHOW CREATE` output for each table, sequence, view,
+/// routine and event, a trigger's row in information_schema, whether a view
+/// takes a DELETE, plus `CHECKSUM TABLE` and the row count of every table.
+/// The fingerprint never goes through the backup code, so a value that
+/// comes back different is caught even when the dump "looks" right.
 ///
 /// Both sessions are set up unlike the server's defaults on purpose
 /// (another time zone and `ANSI_QUOTES` while reading; another time zone,
@@ -250,14 +251,18 @@ final class BackupRoundTripTests: XCTestCase {
             result["\(kind) \(name) rows"] = count?.column("n")?.string
         }
 
+        // A trigger by its parts, the order it fires in included, rather than
+        // SHOW CREATE TRIGGER: on MariaDB that's the statement as it was
+        // typed, which a backup writes without the database it may name.
         let triggers = try await service.rawQuery("""
-            SELECT TRIGGER_NAME AS name, ACTION_ORDER AS action_order FROM information_schema.TRIGGERS
-            WHERE TRIGGER_SCHEMA = '\(database)'
+            SELECT * FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA = '\(database)'
             """).rows
         for trigger in triggers {
-            let name = try XCTUnwrap(trigger.column("name")?.string)
-            result["trigger \(name)"] = try await showCreate("SHOW CREATE TRIGGER `\(database)`.`\(name)`")
-            result["trigger \(name) order"] = trigger.column("action_order")?.string
+            let name = try XCTUnwrap(trigger.column("TRIGGER_NAME")?.string)
+            result["trigger \(name)"] = trigger.columnDefinitions
+                .filter { !["TRIGGER_SCHEMA", "EVENT_OBJECT_SCHEMA", "CREATED"].contains($0.name) }
+                .map { "\($0.name)=\(trigger.column($0.name)?.string ?? "NULL")" }
+                .joined(separator: "\n")
         }
 
         let routines = try await service.rawQuery("""
@@ -524,6 +529,10 @@ final class BackupRoundTripTests: XCTestCase {
         // WITH CHECK OPTION on a view built on a view that sorts after it:
         // refused while that one is a stand-in, which can't be updated.
         "CREATE VIEW a_checked_on_view AS SELECT id, a FROM z_base_view WHERE a > 0 WITH CASCADED CHECK OPTION",
+        // A trigger named with its database, as the app's own Create Trigger
+        // template writes one: a copy must get it, not the original a
+        // second one.
+        "CREATE TRIGGER `mysqlmacclient_roundtrip`.`qualified_trigger` AFTER UPDATE ON `mysqlmacclient_roundtrip`.`audited` FOR EACH ROW SET @audited_updates = 1",
     ]
 
     /// MariaDB-only, after `mariaDBCorpus`.

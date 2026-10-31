@@ -223,17 +223,42 @@ struct SchemaIntrospectionService {
     /// `SHOW CREATE TRIGGER` returns the definition in `SQL Original
     /// Statement` — a different column name than `showCreateRoutine`'s.
     func showCreateTrigger(_ trigger: TriggerInfo) async throws -> String {
-        try await triggerDefinition(trigger).statement
-    }
-
-    /// `showCreateTrigger`, with the settings the trigger was created under.
-    func triggerDefinition(_ trigger: TriggerInfo) async throws -> (statement: String, settings: CreationSettings) {
         let qualified = try Self.qualifiedIdentifier(database: trigger.database, name: trigger.name)
         let rows = try await service.query("SHOW CREATE TRIGGER \(qualified)")
-        guard let row = rows.first, let raw = row.column("SQL Original Statement")?.string else {
+        guard let raw = rows.first?.column("SQL Original Statement")?.string else {
             throw MySQLServiceError.invalidIdentifier(trigger.name)
         }
-        return (raw, Self.creationSettings(of: row))
+        return raw
+    }
+
+    /// The trigger's CREATE statement built from its `SHOW TRIGGERS` row,
+    /// with the settings it was created under. Not `showCreateTrigger`'s:
+    /// MariaDB keeps that as it was typed, so a trigger created as
+    /// `` `db`.`name` `` ON `` `db`.`table` `` names its database, and
+    /// restored into another one would go back into the original. Nor the
+    /// FOLLOWS or PRECEDES it may have been created with: a trigger fires
+    /// after the ones of its table, timing and event created before it, so
+    /// creating them in the order SHOW TRIGGERS lists them keeps the order.
+    func triggerDefinition(_ trigger: TriggerInfo) async throws -> (statement: String, settings: CreationSettings) {
+        let rows = try await service.query("""
+            SHOW TRIGGERS FROM \(try Self.quotedIdentifier(trigger.database)) \
+            WHERE `Trigger` = '\(SQLExporter.escapeStringLiteral(trigger.name))'
+            """)
+        // Exactly this name: that comparison ignores case.
+        guard let row = rows.first(where: { $0.column("Trigger")?.string == trigger.name }),
+              let timing = row.column("Timing")?.string, let event = row.column("Event")?.string,
+              let table = row.column("Table")?.string, let body = row.column("Statement")?.string,
+              let definer = row.column("Definer")?.string else {
+            throw MySQLServiceError.invalidIdentifier(trigger.name)
+        }
+        // `user@host`, unquoted: a host can't hold an @, a user name can. A
+        // MariaDB role has no host.
+        let quotedDefiner = definer.lastIndex(of: "@").map {
+            SQLExporter.quoted(String(definer[..<$0])) + "@" + SQLExporter.quoted(String(definer[definer.index(after: $0)...]))
+        } ?? SQLExporter.quoted(definer)
+        let statement = "CREATE DEFINER=\(quotedDefiner) TRIGGER \(SQLExporter.quoted(trigger.name)) \(timing) \(event) "
+            + "ON \(SQLExporter.quoted(table)) FOR EACH ROW \(body)"
+        return (statement, Self.creationSettings(of: row))
     }
 
     /// `SHOW EVENTS FROM db` — same identifier-`FROM` shape as
