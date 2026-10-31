@@ -34,9 +34,10 @@ final class DatabaseRestoreViewModelTests: XCTestCase {
         try await service.disconnect()
     }
 
-    private func restore(_ contents: Data, configure: (DatabaseRestoreViewModel) -> Void = { _ in }) async throws -> DatabaseRestoreViewModel {
+    private func restore(_ contents: Data, using connection: MySQLService? = nil,
+                         configure: (DatabaseRestoreViewModel) -> Void = { _ in }) async throws -> DatabaseRestoreViewModel {
         try contents.write(to: fileURL)
-        let viewModel = DatabaseRestoreViewModel(service: service, database: DatabaseInfo(name: database))
+        let viewModel = DatabaseRestoreViewModel(service: connection ?? service, database: DatabaseInfo(name: database))
         viewModel.inputFileURL = fileURL
         configure(viewModel)
         viewModel.startRestore()
@@ -229,6 +230,32 @@ final class DatabaseRestoreViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.failure, .stoppedAtError(line: 4))
         let collation = try await service.query("SELECT DEFAULT_COLLATION_NAME AS c FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = '\(other)'")
         XCTAssertEqual(collation.first?.column("c")?.string, "utf8mb4_unicode_ci")
+    }
+
+    /// The restore starts in the chosen database, whatever the connection
+    /// logged in to. With the file deciding, a file with no USE (a plain
+    /// `mysqldump db`) went into the profile's database and replaced its
+    /// tables; and once that database was dropped, no restore could start.
+    func testStartsInTheChosenDatabaseNotTheConnectionsDefault() async throws {
+        _ = try await service.rawQuery("CREATE DATABASE `\(other)`")
+        _ = try await service.rawQuery("CREATE TABLE `\(other)`.t (id INT PRIMARY KEY)")
+        _ = try await service.rawQuery("INSERT INTO `\(other)`.t VALUES (99)")
+        let profile = MySQLService()
+        try await profile.connect(host: TestDatabase.host, port: TestDatabase.port, username: TestDatabase.username,
+                                  password: TestDatabase.password, database: other)
+        addTeardownBlock { try? await profile.disconnect() }
+        let dump = Data("DROP TABLE IF EXISTS t;\nCREATE TABLE t (id INT PRIMARY KEY);\nINSERT INTO t VALUES (7);\n".utf8)
+
+        let followingTheFile = try await restore(dump, using: profile) { $0.useDatabaseNamedInFile = true }
+        XCTAssertNil(followingTheFile.errorMessage)
+        let restored = try? await ids(in: "t")
+        XCTAssertEqual(restored, [7])
+        let profilesRows = try await service.query("SELECT id FROM `\(other)`.t").compactMap { $0.column("id")?.int }
+        XCTAssertEqual(profilesRows, [99], "the profile's own database must be left alone")
+
+        _ = try await service.rawQuery("DROP DATABASE `\(other)`")
+        let afterItsDrop = try await restore(dump, using: profile)
+        XCTAssertNil(afterItsDrop.errorMessage)
     }
 
     func testFollowsTheFilesOwnDatabaseWhenAsked() async throws {

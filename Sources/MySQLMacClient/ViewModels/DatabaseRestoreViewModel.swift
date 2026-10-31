@@ -58,14 +58,14 @@ final class DatabaseRestoreViewModel: ObservableObject {
         }
     }
 
-    /// The database the file is restored into, unless
-    /// `useDatabaseNamedInFile` is on.
+    /// The database the restore starts in, and unless
+    /// `useDatabaseNamedInFile` is on the only one it touches.
     let database: DatabaseInfo
     @Published var inputFileURL: URL?
     /// Off (the default): everything goes into `database`, and the file's
     /// own USE, CREATE DATABASE and DROP DATABASE statements are skipped, so
     /// it can't touch the database it was made from. On: the file decides,
-    /// as it would with the `mysql` client.
+    /// starting in `database`, as `mysql <database> < file` would.
     @Published var useDatabaseNamedInFile = false
     @Published var stopOnFirstError = true
     @Published private(set) var isRunning = false
@@ -138,9 +138,7 @@ final class DatabaseRestoreViewModel: ObservableObject {
             let totalBytes = Int64((try? inputFileURL.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0)
             let connection = try await service.openSeparateConnection()
             target = connection
-            if !useDatabaseNamedInFile {
-                _ = try await connection.textQuery("USE \(try SchemaIntrospectionService.quotedIdentifier(database.name))")
-            }
+            _ = try await connection.textQuery("USE \(try SchemaIntrospectionService.quotedIdentifier(database.name))")
 
             var splitter = DelimiterScript.Splitter()
             splitter.noBackslashEscapes = try await Self.hasNoBackslashEscapes(connection)

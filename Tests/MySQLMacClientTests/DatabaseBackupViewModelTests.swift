@@ -600,8 +600,7 @@ final class DatabaseBackupViewModelTests: XCTestCase {
         while viewModel.progress?.currentObjectDescription.isEmpty ?? true { await Task.yield() }
         try await Task.sleep(for: .milliseconds(100))
         let backupConnection = try await service.query("""
-            SELECT ID AS id FROM information_schema.PROCESSLIST
-            WHERE ID > \(newestBefore) AND DB = 'mysqlmacclient_test'
+            SELECT ID AS id FROM information_schema.PROCESSLIST WHERE ID > \(newestBefore)
             """)
         try await kill(XCTUnwrap(backupConnection.first?.column("id")?.int, "the backup reads on a connection of its own"))
         while viewModel.isRunning { await Task.yield() }

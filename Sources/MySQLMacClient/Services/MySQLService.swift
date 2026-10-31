@@ -133,7 +133,9 @@ actor MySQLService {
     /// A second connection with this one's credentials, for a job that
     /// changes its session (a restore runs USE and the file's own SET
     /// statements) and so mustn't share the connection the rest of the app
-    /// is using. It doesn't reconnect by itself.
+    /// is using. It starts in no database, since the one this connection
+    /// logged in to may have been dropped since, and it doesn't reconnect
+    /// by itself.
     func openSeparateConnection() async throws -> MySQLService {
         guard let credentials = lastCredentials else { throw MySQLServiceError.notConnected }
         let separate = MySQLService()
@@ -142,7 +144,7 @@ actor MySQLService {
             port: credentials.port,
             username: credentials.username,
             password: credentials.password,
-            database: credentials.database
+            database: nil
         )
         await separate.disableAutomaticReconnect()
         return separate
