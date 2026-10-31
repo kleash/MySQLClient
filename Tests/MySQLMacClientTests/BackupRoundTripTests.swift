@@ -337,6 +337,18 @@ final class BackupRoundTripTests: XCTestCase {
         "CREATE TABLE `tick``\u{301}mark` (id INT PRIMARY KEY)",
         "INSERT INTO `tick``\u{301}mark` VALUES (1)",
 
+        // Keys that sort one way and compare with a literal another: ENUM
+        // and SET by member number against 'text', BIT by value against
+        // X'..'.
+        "CREATE TABLE enum_key (u INT, role ENUM('owner', 'admin', 'member'), PRIMARY KEY (u, role))",
+        "INSERT INTO enum_key VALUES " + (1...4).flatMap { u in ["owner", "admin", "member"].map { "(\(u), '\($0)')" } }.joined(separator: ", "),
+        "CREATE TABLE set_key (s SET('x', 'b', 'a') PRIMARY KEY)",
+        "INSERT INTO set_key VALUES " + (0...7).map { "(\($0))" }.joined(separator: ", "),
+        "CREATE TABLE bit_key (b BIT(16) PRIMARY KEY)",
+        "INSERT INTO bit_key VALUES " + (1...20).map { "(\($0 * 300))" }.joined(separator: ", "),
+        "CREATE TABLE int_bit_key (a INT, f BIT(1), PRIMARY KEY (a, f))",
+        "INSERT INTO int_bit_key VALUES " + (1...10).map { "(\($0), 0), (\($0), 1)" }.joined(separator: ", "),
+
         // ---- End of values and paging, continued ----
 
         // Names that need quoting.

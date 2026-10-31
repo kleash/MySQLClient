@@ -606,7 +606,11 @@ final class DatabaseBackupViewModel: ObservableObject {
     /// this: ~1.15M rows) finishing in seconds rather than tens of minutes.
     /// The last key goes back to the server exactly as it came
     /// (`SQLExporter.sqlLiteral`): a rounded DATETIME(6) or DECIMAL key
-    /// would ask for the same page again forever.
+    /// would ask for the same page again forever. A key that can't be
+    /// sought from (one with an ENUM, SET or BIT column, or a generated
+    /// column the SELECT leaves out) still orders the pages, with `OFFSET`:
+    /// that order is unique and the index's own, so the server walks the
+    /// index instead of sorting the table for every page.
     ///
     /// Ordering also makes paging *correct*, not just fast: `LIMIT` across
     /// separate queries has no row-order guarantee without an `ORDER BY`,
@@ -631,13 +635,18 @@ final class DatabaseBackupViewModel: ObservableObject {
                 : SQLExporter.quoted(column.name)
         }.joined(separator: ", ")
 
-        let keyColumnNames = allColumns.filter(\.isPrimaryKey).map(\.name)
+        let keyColumns = allColumns.filter(\.isPrimaryKey)
+        let keyColumnNames = keyColumns.map(\.name)
         // Resolved once: which positions in a fetched row carry the key
         // values that seed the next page's `WHERE`.
         let keyIndexes = keyColumnNames.compactMap { key in columns.firstIndex { $0.name == key } }
+        // ENUM and SET sort by member number and BIT by value, but compare
+        // differently with the 'text' or X'..' a seek would start from, so
+        // a page would skip or repeat rows (or, for BIT, never end).
         let canSeekByKey = !keyColumnNames.isEmpty && keyIndexes.count == keyColumnNames.count
+            && !keyColumns.contains { ["enum", "set", "bit"].contains(where: $0.mysqlType.lowercased().hasPrefix) }
         let quotedKeyList = keyColumnNames.map(SQLExporter.quoted).joined(separator: ", ")
-        let orderList = canSeekByKey ? quotedKeyList : selectList
+        let orderList = keyColumnNames.isEmpty ? selectList : quotedKeyList
 
         var lastKeyLiterals: [String]?
         var offset = 0
