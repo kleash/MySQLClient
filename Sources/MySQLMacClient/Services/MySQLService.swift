@@ -172,6 +172,8 @@ actor MySQLService {
 
     static func tlsConfiguration(_ mode: TLSMode) -> TLSConfiguration {
         var configuration = TLSConfiguration.makeClientConfiguration()
+        // NIOSSL would still take TLS 1.0 and 1.1, which are broken (RFC 8996).
+        configuration.minimumTLSVersion = .tlsv12
         if mode == .required {
             configuration.certificateVerification = .none
         }

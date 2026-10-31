@@ -81,6 +81,16 @@ final class TLSConnectionTests: XCTestCase {
         }
     }
 
+    /// TLS 1.0 and 1.1 are broken (RFC 8996): an encrypted connection
+    /// refuses them, even when the server has nothing newer.
+    func testEncryptionRefusesTLSOlderThan1_2() async throws {
+        let port = try await startFakeServer(maximumTLSVersion: .tlsv11).server.localAddress!.port!
+        let outcome = await loginOutcome(.required, port: port)
+        // The client offers nothing older than 1.2, so the server has no
+        // version in common with it.
+        XCTAssertTrue(outcome.contains("ALERT_PROTOCOL_VERSION"), outcome)
+    }
+
     /// How logging in to the fake server ends: it never lets anyone in.
     private func loginOutcome(_ tls: TLSMode, port: Int) async -> String {
         do {
@@ -93,7 +103,7 @@ final class TLSConnectionTests: XCTestCase {
 
     /// A `FakeMySQLServer` on 127.0.0.1 with a certificate for `localhost`
     /// that /usr/bin/openssl makes just now. It stops when the test ends.
-    private func startFakeServer() async throws -> (server: Channel, certificates: [NIOSSLCertificate]) {
+    private func startFakeServer(maximumTLSVersion: TLSVersion? = nil) async throws -> (server: Channel, certificates: [NIOSSLCertificate]) {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
@@ -110,10 +120,11 @@ final class TLSConnectionTests: XCTestCase {
         openssl.waitUntilExit()
 
         let certificates = try NIOSSLCertificate.fromPEMFile(certificatePath)
-        let configuration = TLSConfiguration.makeServerConfiguration(
+        var configuration = TLSConfiguration.makeServerConfiguration(
             certificateChain: certificates.map { .certificate($0) },
             privateKey: .privateKey(try NIOSSLPrivateKey(file: keyPath, format: .pem))
         )
+        configuration.maximumTLSVersion = maximumTLSVersion
         let tls = try NIOSSLContext(configuration: configuration)
         let server = try await ServerBootstrap(group: MultiThreadedEventLoopGroup.singleton)
             .childChannelInitializer { channel in
