@@ -71,10 +71,16 @@ targets:
         # Dışarıya TCP (MySQL sunucularına bağlantı) — sandbox altında bu
         # izin olmadan hiçbir bağlantı kurulamaz.
         com.apple.security.network.client: true
+        # Listening on 127.0.0.1, for an SSH tunnel: ssh's local forward and
+        # the relay ssh reaches an HTTP proxy through. Without it bind()
+        # fails with "Operation not permitted".
+        com.apple.security.network.server: true
         # NSOpenPanel/NSSavePanel ile kullanıcının seçtiği dosyalara (Table
         # Export/Import, DB Backup) erişim — bu izin olmadan sandbox'lı bir
         # build'de Powerbox paneli hiç açılmıyor (swift run'da fark
         # edilmiyor çünkü o build gerçekten sandbox'lı değil).
+        # It also lets the SSH folder the user chose be kept as a
+        # security-scoped bookmark; files.bookmarks.app-scope isn't needed.
         com.apple.security.files.user-selected.read-write: true
     settings:
       base:

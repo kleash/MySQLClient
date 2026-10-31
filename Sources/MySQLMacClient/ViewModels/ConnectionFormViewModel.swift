@@ -27,8 +27,13 @@ final class ConnectionFormViewModel: ObservableObject {
     @Published var proxyUsername = ""
     @Published var proxyPassword = ""
     /// The folder ssh keeps its config, known hosts and keys in; nil for
-    /// its own (~/.ssh).
-    var sshFolder: URL?
+    /// its own (~/.ssh). In the App Sandbox ssh can't open ~/.ssh, only a
+    /// folder the user chose, kept for later launches as a bookmark.
+    @Published var sshFolder: URL?
+
+    /// The release app is sandboxed; `swift run` isn't.
+    static let isSandboxed = ProcessInfo.processInfo.environment["APP_SANDBOX_CONTAINER_ID"] != nil
+    private static let sshFolderDefaultsKey = "sshFolderBookmark"
 
     @Published private(set) var isConnecting = false
     @Published var errorMessage: String?
@@ -43,6 +48,19 @@ final class ConnectionFormViewModel: ObservableObject {
 
     init(connectionStore: ConnectionStore) {
         self.connectionStore = connectionStore
+        if Self.isSandboxed, let bookmark = UserDefaults.standard.data(forKey: Self.sshFolderDefaultsKey) {
+            // shortcut: a stale bookmark isn't renewed; it still resolves
+            // while the folder can be found, and is chosen again if not.
+            var isStale = false
+            sshFolder = try? URL(resolvingBookmarkData: bookmark, options: .withSecurityScope, bookmarkDataIsStale: &isStale)
+        }
+    }
+
+    /// The SSH folder the user chose in the open panel, for ssh now and
+    /// after the next launch.
+    func useSSHFolder(_ folder: URL) {
+        UserDefaults.standard.set(try? folder.bookmarkData(options: .withSecurityScope), forKey: Self.sshFolderDefaultsKey)
+        sshFolder = folder
     }
 
     /// Populates the form from a saved connection (selected in the sidebar)
@@ -96,6 +114,12 @@ final class ConnectionFormViewModel: ObservableObject {
         errorMessage = nil
         guard let portNumber = Int(port) else {
             errorMessage = String(localized: "Port must be numeric.")
+            return nil
+        }
+        // Without a folder to keep known_hosts in, a sandboxed ssh would
+        // trust any host key it's shown, every time.
+        if usesSSH, Self.isSandboxed, sshFolder == nil {
+            errorMessage = String(localized: "Choose your SSH folder first: ssh can only use the keys and known hosts in a folder you choose.")
             return nil
         }
 

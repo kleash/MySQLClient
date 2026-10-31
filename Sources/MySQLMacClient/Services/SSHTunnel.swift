@@ -28,6 +28,7 @@ final class SSHTunnel: @unchecked Sendable {
     private var relay: ProxyRelay?
     private var arguments: [String] = []
     private var isClosed = false
+    private var isAccessingFolder = false
     private var restartDelay: TimeInterval = 1
 
     init(settings: SSHSettings, proxy: HTTPProxyConnector.Proxy?, sshFolder: URL?) {
@@ -43,33 +44,43 @@ final class SSHTunnel: @unchecked Sendable {
     /// Starts ssh and waits until the forward is listening; the local port
     /// that leads to `databaseHost:databasePort` as the SSH server sees it.
     func open(to databaseHost: String, port databasePort: Int) async throws -> Int {
-        if let proxy {
-            relay = try ProxyRelay(proxy: proxy, targetHost: settings.host, targetPort: settings.port)
-        }
-        let localPort = try Self.freeLocalPort()
-        arguments = Self.arguments(
-            settings: settings,
-            localPort: localPort,
-            databaseHost: databaseHost,
-            databasePort: databasePort,
-            relayPort: relay?.port,
-            sshFolder: sshFolder
-        )
+        // In the App Sandbox ssh, a child of this process, can open the SSH
+        // folder only while this process is accessing it, and loses it the
+        // moment that stops: so from before the arguments look into it
+        // until close(), across every restart.
+        isAccessingFolder = sshFolder?.startAccessingSecurityScopedResource() ?? false
         do {
+            if let proxy {
+                relay = try ProxyRelay(proxy: proxy, targetHost: settings.host, targetPort: settings.port)
+            }
+            let localPort = try Self.freeLocalPort()
+            arguments = Self.arguments(
+                settings: settings,
+                localPort: localPort,
+                databaseHost: databaseHost,
+                databasePort: databasePort,
+                relayPort: relay?.port,
+                sshFolder: sshFolder
+            )
             try await start()
+            return localPort
         } catch {
             close()
             throw error
         }
-        return localPort
     }
 
     func close() {
-        lock.withLock {
-            isClosed = true
+        // Only the first call: deinit calls this again, and the folder's
+        // access has to be given back exactly once.
+        let closing = lock.withLock {
+            defer { isClosed = true }
             if process?.isRunning == true { process?.terminate() }
+            return !isClosed
         }
+        guard closing else { return }
         relay?.close()
+        if isAccessingFolder { sshFolder?.stopAccessingSecurityScopedResource() }
     }
 
     /// ssh's arguments: no shell, no stdin, the forward, keepalives that

@@ -175,6 +175,18 @@ struct ConnectionFormView: View {
                         TextField("", text: $viewModel.sshUsername)
                             .visibleFieldBorder()
                     }
+                    if ConnectionFormViewModel.isSandboxed {
+                        formRow("SSH Folder") {
+                            HStack(spacing: 8) {
+                                Text(viewModel.sshFolder?.path ?? String(localized: "Not chosen — ssh can only use a folder you choose"))
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                                    .truncationMode(.middle)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                Button("Choose…", action: chooseSSHFolder)
+                            }
+                        }
+                    }
                     formRow("SSH Key") {
                         HStack(spacing: 8) {
                             TextField("Optional — ssh-agent and ~/.ssh if empty", text: $viewModel.sshKeyFile)
@@ -260,10 +272,29 @@ struct ConnectionFormView: View {
     private func chooseKeyFile() {
         let panel = NSOpenPanel()
         panel.showsHiddenFiles = true
-        panel.directoryURL = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".ssh")
+        panel.directoryURL = viewModel.sshFolder ?? Self.homeSSHFolder
         if panel.runModal() == .OK, let url = panel.url {
             viewModel.sshKeyFile = url.path
         }
+    }
+
+    private func chooseSSHFolder() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.showsHiddenFiles = true
+        panel.directoryURL = Self.homeSSHFolder
+        panel.message = String(localized: "Choose the folder ssh keeps your keys and known hosts in, usually .ssh in your home folder.")
+        if panel.runModal() == .OK, let url = panel.url {
+            viewModel.useSSHFolder(url)
+        }
+    }
+
+    /// ~/.ssh. Not from `homeDirectoryForCurrentUser`: in the App Sandbox
+    /// that's the app's container.
+    private static var homeSSHFolder: URL {
+        let home = getpwuid(getuid())?.pointee.pw_dir.map { String(cString: $0) } ?? NSHomeDirectory()
+        return URL(fileURLWithPath: home).appendingPathComponent(".ssh")
     }
 
     /// One `Grid` row: right-aligned label in the shared label column,
