@@ -408,7 +408,7 @@ final class DatabaseBackupViewModel: ObservableObject {
     /// throughout rather than assuming `execute` handles them.
     private func beginSourceSession() async throws {
         if options.source.lockTablesForReading, !selectedTables.isEmpty {
-            let lockList = selectedTables.sorted { $0.name < $1.name }.map { "`\($0.name)` READ" }.joined(separator: ", ")
+            let lockList = selectedTables.sorted { $0.name < $1.name }.map { "\(SQLExporter.quoted($0.name)) READ" }.joined(separator: ", ")
             _ = try await service.rawQuery("LOCK TABLES \(lockList)")
         }
         if options.source.useSingleTransaction {
@@ -430,10 +430,10 @@ final class DatabaseBackupViewModel: ObservableObject {
     private func writeHeader(to fileHandle: FileHandle) async throws {
         var header = ""
         if options.file.includeCreateDatabaseStatement {
-            header += "CREATE DATABASE IF NOT EXISTS `\(database.name)`;\n"
+            header += "CREATE DATABASE IF NOT EXISTS \(SQLExporter.quoted(database.name));\n"
         }
         if options.file.includeUseStatement {
-            header += "USE `\(database.name)`;\n"
+            header += "USE \(SQLExporter.quoted(database.name));\n"
         }
         if options.file.setForeignKeyChecksToZero {
             header += "SET FOREIGN_KEY_CHECKS=0;\n"
@@ -553,7 +553,7 @@ final class DatabaseBackupViewModel: ObservableObject {
             if !wroteAnyRows {
                 wroteAnyRows = true
                 if options.file.lockInsertStatements {
-                    fileHandle.write(Data("LOCK TABLES `\(table.name)` WRITE;\n".utf8))
+                    fileHandle.write(Data("LOCK TABLES \(SQLExporter.quoted(table.name)) WRITE;\n".utf8))
                 }
             }
 

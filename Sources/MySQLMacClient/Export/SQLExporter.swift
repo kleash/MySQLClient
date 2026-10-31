@@ -6,6 +6,11 @@ import Foundation
 /// the same convention `showCreateView`/`showCreateRoutine` already use)
 /// followed by one `INSERT INTO` statement per row.
 enum SQLExporter {
+    /// `` `name` ``, with any backtick inside doubled.
+    static func quoted(_ name: String) -> String {
+        "`" + name.replacingOccurrences(of: "`", with: "``") + "`"
+    }
+
     /// Swaps the leading `CREATE TABLE` for `CREATE TABLE IF NOT EXISTS` and
     /// terminates the statement — `SHOW CREATE TABLE`'s own output has
     /// neither the `IF NOT EXISTS` clause nor a trailing `;`.
@@ -46,8 +51,8 @@ enum SQLExporter {
         columns: [ColumnInfo],
         values: [RowValue]
     ) -> String {
-        let qualified = "`\(database)`.`\(table)`"
-        let columnList = columns.map { "`\($0.name)`" }.joined(separator: ", ")
+        let qualified = "\(quoted(database)).\(quoted(table))"
+        let columnList = columns.map { quoted($0.name) }.joined(separator: ", ")
         let valueList = values.map(sqlLiteral).joined(separator: ", ")
         return "INSERT INTO \(qualified) (\(columnList)) VALUES (\(valueList));"
     }
@@ -102,18 +107,18 @@ enum SQLExporter {
     // MARK: - Database Backup
 
     static func dropTableStatement(database: String, table: String) -> String {
-        "DROP TABLE IF EXISTS `\(database)`.`\(table)`;"
+        "DROP TABLE IF EXISTS \(quoted(database)).\(quoted(table));"
     }
 
     static func dropViewStatement(database: String, view: String) -> String {
-        "DROP VIEW IF EXISTS `\(database)`.`\(view)`;"
+        "DROP VIEW IF EXISTS \(quoted(database)).\(quoted(view));"
     }
 
     /// Works for both procedures and functions via `RoutineInfo.kind
     /// .sqlKeyword` — same "one type instead of two" principle
     /// `RoutineKind`'s own doc comment describes.
     static func dropRoutineStatement(_ routine: RoutineInfo) -> String {
-        "DROP \(routine.kind.sqlKeyword) IF EXISTS `\(routine.database)`.`\(routine.name)`;"
+        "DROP \(routine.kind.sqlKeyword) IF EXISTS \(quoted(routine.database)).\(quoted(routine.name));"
     }
 
     /// Wraps a routine's raw `SHOW CREATE <kind>` output (from
@@ -143,8 +148,8 @@ enum SQLExporter {
         maxStatementByteBudget: Int = 512_000
     ) -> [String] {
         guard !rows.isEmpty else { return [] }
-        let qualified = "`\(database)`.`\(table)`"
-        let columnList = columns.map { "`\($0.name)`" }.joined(separator: ", ")
+        let qualified = "\(quoted(database)).\(quoted(table))"
+        let columnList = columns.map { quoted($0.name) }.joined(separator: ", ")
         let prefix = "INSERT INTO \(qualified) (\(columnList)) VALUES "
 
         var statements: [String] = []

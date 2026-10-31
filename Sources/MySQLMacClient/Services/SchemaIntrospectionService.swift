@@ -232,14 +232,14 @@ struct SchemaIntrospectionService {
         return rows.compactMap { $0.column("Collation")?.string }.sorted()
     }
 
-    /// Backtick-escapes a single identifier. Only ever call this with names
-    /// that came from `SHOW DATABASES`/`SHOW TABLES`/`SHOW COLUMNS`, never
-    /// raw user input.
+    /// Backtick-quotes a single identifier, doubling any backtick inside it
+    /// the way the server itself does (`` `odd``name` `` is the table
+    /// odd`name), so every name the server can hold can be addressed.
     static func quotedIdentifier(_ raw: String) throws -> String {
-        guard !raw.isEmpty, !raw.contains("`") else {
+        guard !raw.isEmpty else {
             throw MySQLServiceError.invalidIdentifier(raw)
         }
-        return "`\(raw)`"
+        return SQLExporter.quoted(raw)
     }
 
     /// `` `database`.`table` `` — both parts individually validated/escaped.

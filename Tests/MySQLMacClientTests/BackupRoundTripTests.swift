@@ -204,6 +204,9 @@ final class BackupRoundTripTests: XCTestCase {
         // Names that need quoting.
         "CREATE TABLE `select` (`from` INT PRIMARY KEY, `order` VARCHAR(5))",
         "INSERT INTO `select` VALUES (1, 'x')",
+        "CREATE TABLE `odd``name` (`col``tick` INT PRIMARY KEY)",
+        "INSERT INTO `odd``name` VALUES (1), (2)",
+        "CREATE VIEW `odd``view` AS SELECT `col``tick` FROM `odd``name`",
 
         // A view, and routines.
         "CREATE VIEW positive_checks AS SELECT id, qty FROM checked WHERE qty > 0",

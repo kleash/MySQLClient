@@ -274,7 +274,9 @@ final class SchemaIntrospectionServiceTests: XCTestCase {
         _ = try await service.rawQuery("DROP EVENT IF EXISTS introspection_test_event")
     }
 
-    func testQuotedIdentifierRejectsBacktick() {
-        XCTAssertThrowsError(try SchemaIntrospectionService.quotedIdentifier("evil`table"))
+    func testQuotedIdentifierDoublesBackticks() throws {
+        XCTAssertEqual(try SchemaIntrospectionService.quotedIdentifier("evil`table"), "`evil``table`")
+        XCTAssertEqual(try SchemaIntrospectionService.quotedIdentifier("x` ; DROP TABLE t; --"), "`x`` ; DROP TABLE t; --`")
+        XCTAssertThrowsError(try SchemaIntrospectionService.quotedIdentifier(""))
     }
 }
