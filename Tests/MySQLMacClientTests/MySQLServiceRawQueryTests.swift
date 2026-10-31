@@ -16,6 +16,13 @@ final class MySQLServiceRawQueryTests: XCTestCase {
             password: TestDatabase.password,
             database: "mysqlmacclient_test"
         )
+        try await service.execute("DELETE FROM widgets")
+        try await service.execute("""
+            INSERT INTO widgets (name, quantity, created_at, notes) VALUES
+            ('Bolt', 100, '2024-01-15 10:30:00', 'Standard bolt'),
+            ('Nut', 250, '2024-02-20 14:00:00', NULL),
+            ('Washer', NULL, NULL, 'Out of stock')
+            """)
     }
 
     override func tearDown() async throws {
