@@ -57,6 +57,11 @@ final class SQLExporterTests: XCTestCase {
         XCTAssertEqual(SQLExporter.hexLiteral(Data()), "X''")
     }
 
+    func testHexLiteralWritesEveryByteAsTwoDigits() {
+        let expected = "X'" + (0...255).map { String(format: "%02x", $0) }.joined() + "'"
+        XCTAssertEqual(SQLExporter.hexLiteral(Data(0...255)), expected)
+    }
+
     func testWriteEmitsCreateTableFollowedByOneInsertPerRow() throws {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID().uuidString).sql")
         FileManager.default.createFile(atPath: url.path, contents: nil)

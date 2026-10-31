@@ -130,10 +130,20 @@ enum SQLExporter {
 
     /// MySQL's native binary literal syntax — used for `.blob` values
     /// rather than trying to force raw bytes through a quoted string.
+    ///
+    /// Two digits looked up per byte: formatting each byte as a string took
+    /// about a second per MB, on the main actor, for every binary value a
+    /// backup writes.
     static func hexLiteral(_ data: Data) -> String {
-        guard !data.isEmpty else { return "X''" }
-        let hex = data.map { String(format: "%02x", $0) }.joined()
-        return "X'\(hex)'"
+        let digits = Array("0123456789abcdef".utf8)
+        var literal = Array("X'".utf8)
+        literal.reserveCapacity(data.count * 2 + 3)
+        for byte in data {
+            literal.append(digits[Int(byte >> 4)])
+            literal.append(digits[Int(byte & 0x0F)])
+        }
+        literal.append(UInt8(ascii: "'"))
+        return String(decoding: literal, as: UTF8.self)
     }
 
     static func write(
