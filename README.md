@@ -26,6 +26,7 @@ A native macOS MySQL management tool built with **Swift 6 / SwiftUI**, available
 
 ### Connection Management
 - Multiple connection profiles with named presets
+- Connect **through an SSH server**, optionally behind an HTTP proxy that wants a login (see [SSH and HTTP proxy](#ssh-and-http-proxy))
 - Passwords stored securely in **macOS Keychain** (never on disk)
 - Connection metadata persisted in `~/Library/Application Support/MySQL Client/connections.json`
 
@@ -193,6 +194,36 @@ views, routines, triggers, events, rows and checksums as before.
 > ```sql
 > ALTER USER 'your_user'@'%' IDENTIFIED WITH mysql_native_password BY 'your_password';
 > ```
+
+### SSH and HTTP proxy
+
+For a database that only a server you can SSH into can reach, tick
+**Connect through an SSH server**. **Host** and **Port** are then the
+database *as the SSH server sees it* (often `127.0.0.1` and `3306`), and
+**SSH Host**, its port and **SSH Username** are the SSH server. **SSH Key**
+takes a private key file; left empty, ssh uses the keys it finds itself.
+
+The app runs macOS's own `/usr/bin/ssh` with a local port forward, connects
+through it, and starts ssh again if it drops. ssh never asks for anything:
+there's no password login, and a key with a passphrase has to be loaded
+into ssh-agent first (`ssh-add`). A server's host key is trusted the first
+time it's seen and kept in `known_hosts`; a key that has changed since is
+refused.
+
+**Reach the SSH server through an HTTP proxy** puts a proxy in front of the
+SSH server (`CONNECT`, with a Basic or Digest login when it asks for one).
+Its password is kept in the Keychain along with the database password, and
+never given to ssh: the app carries ssh's connection through the proxy
+itself.
+
+Under `swift run`, ssh uses `~/.ssh` (its config, `known_hosts`, keys and
+ssh-agent) as it does in Terminal. The signed app is sandboxed, and ssh can
+only open a folder you choose: click **Choose…** next to **SSH Folder** once
+and pick `~/.ssh`; the app keeps it for later launches. ssh then uses that
+folder's `config`, `known_hosts` and `id_ed25519`, `id_ecdsa` or `id_rsa`.
+A key file outside it works only until the app quits. The sandbox lets ssh
+reach macOS 27's own ssh-agent, but not an agent whose socket is elsewhere
+(one set with `IdentityAgent`, say).
 
 ---
 
