@@ -199,6 +199,11 @@ final class BackupRoundTripTests: XCTestCase {
             let quoted = "`\(database)`.`\(name.replacingOccurrences(of: "`", with: "``", options: .literal))`"
             if object.column("type")?.string == "VIEW" {
                 result["view \(name)"] = try await showCreate("SHOW CREATE VIEW \(quoted)")
+                // Whether a view can be updated is decided when it's created,
+                // and nothing the server reports shows it: a view created on
+                // a stand-in never can be. This deletes nothing.
+                let deletable = (try? await service.rawQuery("DELETE FROM \(quoted) WHERE FALSE")) != nil
+                result["view \(name) deletable"] = "\(deletable)"
                 continue
             }
             // MySQL 8 shows a restored column's collation as `CHARACTER SET
@@ -487,6 +492,9 @@ final class BackupRoundTripTests: XCTestCase {
     private static let schemaObjectCorpus: [String] = [
         // A view calling a function: CREATE VIEW checks the function exists.
         "CREATE VIEW uses_function AS SELECT id, doubled(qty) AS twice FROM checked",
+        // WITH CHECK OPTION on a view built on a view that sorts after it:
+        // refused while that one is a stand-in, which can't be updated.
+        "CREATE VIEW a_checked_on_view AS SELECT id, a FROM z_base_view WHERE a > 0 WITH CASCADED CHECK OPTION",
     ]
 
     /// MariaDB-only, after `mariaDBCorpus`.

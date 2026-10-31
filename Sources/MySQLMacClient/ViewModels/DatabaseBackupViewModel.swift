@@ -360,7 +360,6 @@ final class DatabaseBackupViewModel: ObservableObject {
         defer { isRunning = false; backupTask = nil }
 
         guard let outputFileURL else { return }
-        let objects = buildObjectPlan()
         let shared = service
         var source: MySQLService?
         do {
@@ -372,6 +371,7 @@ final class DatabaseBackupViewModel: ObservableObject {
             // `ANSI_QUOTES` change how `SHOW CREATE` writes a statement. The
             // file declares the same time zone (`writeHeader`).
             _ = try await connection.textQuery("SET SESSION time_zone = '+00:00', sql_mode = ''")
+            let objects = try await buildObjectPlan()
             let weights = await unitWeights(for: objects)
             totalUnits = weights.reduce(0, +)
             unitsBeforeCurrentObject = 0
@@ -447,13 +447,41 @@ final class DatabaseBackupViewModel: ObservableObject {
     /// trigger would write its rows a second time) — in the order they
     /// fire, and events last. Alphabetical otherwise, since a `Set` has no
     /// defined order and dump output needs to be deterministic across runs.
-    private func buildObjectPlan() -> [BackupObject] {
-        selectedTables.sorted { ($0.isSequence ? 0 : 1, $0.name) < ($1.isSequence ? 0 : 1, $1.name) }.map { .table($0) }
+    private func buildObjectPlan() async throws -> [BackupObject] {
+        let views = try await viewsInDependencyOrder()
+        return selectedTables.sorted { ($0.isSequence ? 0 : 1, $0.name) < ($1.isSequence ? 0 : 1, $1.name) }.map { .table($0) }
             + selectedProcedures.sorted { $0.name < $1.name }.map { .procedure($0) }
             + selectedFunctions.sorted { $0.name < $1.name }.map { .function($0) }
-            + selectedViews.sorted { $0.name < $1.name }.map { .view($0) }
+            + views.map { .view($0) }
             + allTriggers.filter(selectedTriggers.contains).map { .trigger($0) }
             + selectedEvents.sorted { $0.name < $1.name }.map { .event($0) }
+    }
+
+    /// Each view after the views its definition names, so none is created
+    /// on a stand-in (`writeViewStandIns`): the server decides whether a
+    /// view can be updated when it's created, and one created on a stand-in
+    /// never can be, nor take WITH CHECK OPTION. Alphabetical otherwise.
+    /// Read under an empty SQL mode, a definition quotes every name in it,
+    /// so a view it's built on appears as `` `name` ``; a column that shares
+    /// a view's name only adds an order that isn't needed.
+    private func viewsInDependencyOrder() async throws -> [TableInfo] {
+        let views = selectedViews.sorted { $0.name < $1.name }
+        guard options.mode != .dataOnly else { return views }
+        var definitions: [TableInfo: String] = [:]
+        for view in views {
+            definitions[view] = try await introspection.showCreateView(view.name, inDatabase: database.name)
+        }
+        var ordered: [TableInfo] = []
+        var visited: Set<TableInfo> = []
+        func visit(_ view: TableInfo) {
+            guard visited.insert(view).inserted else { return }
+            for other in views where other != view && definitions[view, default: ""].contains(SQLExporter.quoted(other.name)) {
+                visit(other)
+            }
+            ordered.append(view)
+        }
+        views.forEach(visit)
+        return ordered
     }
 
     /// How much work each planned object represents, so the percentage
@@ -770,9 +798,11 @@ final class DatabaseBackupViewModel: ObservableObject {
     }
 
     /// Before the first view, every selected view is created as a stand-in
-    /// with the same column names, as mysqldump does: a view can be built
-    /// on another view that sorts after it, which has to exist by the time
-    /// it's created. Each real definition then replaces its stand-in.
+    /// with the same column names, as mysqldump does, so a view built on one
+    /// that comes after it anyway still restores: `viewsInDependencyOrder`
+    /// can't put both of two views that name each other first, and finds a
+    /// name only spelled the way the view's own is. Each real definition
+    /// then replaces its stand-in.
     private func writeViewStandIns(to fileHandle: FileHandle) async throws {
         for view in selectedViews.sorted(by: { $0.name < $1.name }) {
             let columns = try await introspection.columns(forTable: view.name, inDatabase: database.name)
