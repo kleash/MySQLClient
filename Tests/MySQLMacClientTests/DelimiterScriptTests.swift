@@ -184,6 +184,30 @@ final class DelimiterScriptTests: XCTestCase {
         ])
     }
 
+    /// Inside an executable comment is SQL, and both the mysql and the
+    /// MariaDB client read it as such: a `*/` in a string doesn't end the
+    /// comment, and a delimiter ends the statement. mysqldump wraps trigger
+    /// and view bodies in these.
+    func testAllStatementsReadsTheInsideOfAnExecutableCommentAsSQL() {
+        let script = """
+            DELIMITER ;;
+            /*!50003 CREATE*/ /*!50003 TRIGGER t_bu BEFORE UPDATE ON t FOR EACH ROW SET NEW.body = REPLACE(NEW.body, '*/', '') */;;
+            DELIMITER ;
+            /*!50001 VIEW `v_file` AS select regexp_replace(`t`.`path`,'^.*/','') AS `file` from `t` */;
+            /*M!100100 SELECT concat('/* ',`t`.`body`,' */') FROM t */;
+            SELECT 1 /*! , 2; */;
+            SELECT 3;
+            """
+        XCTAssertEqual(DelimiterScript.allStatements(from: script), [
+            "/*!50003 CREATE*/ /*!50003 TRIGGER t_bu BEFORE UPDATE ON t FOR EACH ROW SET NEW.body = REPLACE(NEW.body, '*/', '') */",
+            "/*!50001 VIEW `v_file` AS select regexp_replace(`t`.`path`,'^.*/','') AS `file` from `t` */",
+            "/*M!100100 SELECT concat('/* ',`t`.`body`,' */') FROM t */",
+            "SELECT 1 /*! , 2",
+            "*/",
+            "SELECT 3",
+        ])
+    }
+
     /// `--` needs whitespace after it to be a comment, exactly as in
     /// MySQL — otherwise it's a double negation.
     func testAllStatementsTreatsDoubleDashWithoutSpaceAsArithmetic() {
@@ -261,14 +285,15 @@ final class DelimiterScriptTests: XCTestCase {
 
     /// Every chunk size from one byte up must give exactly the statements,
     /// and lines, of splitting the whole script at once: cuts inside
-    /// strings, comments, multi-byte characters, a `DELIMITER` line and a
-    /// two-character delimiter all have to come out the same.
+    /// strings, comments, executable comments, multi-byte characters, a
+    /// `DELIMITER` line and a two-character delimiter all have to come out
+    /// the same.
     func testSplitterMatchesTheWholeScriptAtEveryChunkSize() throws {
         let script = """
             SET NAMES utf8mb4; -- comment; with a semicolon
             INSERT INTO t VALUES ('a;b', 'it''s', 'back\\'slash; x', "dq;", `c;`), ('😀 ünï 中文;');
             # hash comment;
-            /* block; comment */ SELECT 1 /*! executable; */;\r
+            /* block; comment */ SELECT 1 /*! executable; */; /*!50001 SELECT '*/;' */;\r
             SELECT 5--3;
             DELIMITER $$
             CREATE PROCEDURE p()
@@ -280,7 +305,7 @@ final class DelimiterScriptTests: XCTestCase {
             SELECT 'unterminated last statement'
             """
         let expected = DelimiterScript.locatedStatements(from: script)
-        XCTAssertEqual(expected.count, 9)
+        XCTAssertEqual(expected.count, 11)
         let bytes = Array(script.utf8)
         for chunkSize in 1...bytes.count {
             var splitter = DelimiterScript.Splitter()

@@ -138,6 +138,44 @@ final class DatabaseRestoreViewModelTests: XCTestCase {
         XCTAssertEqual(paths, [#"C:\dir"#, "it's"])
     }
 
+    /// mysqldump wraps trigger and view bodies in executable comments, which
+    /// the server and the mysql client read as SQL: a `*/` in one of their
+    /// strings doesn't end the comment. Ending it there, the string's own
+    /// closing quote opened one that swallowed the rest of the file.
+    func testReadsTheInsideOfAnExecutableCommentAsSQL() async throws {
+        let viewModel = try await restore(Data(#"""
+            CREATE TABLE notes (id INT PRIMARY KEY, body TEXT, path VARCHAR(100));
+            INSERT INTO notes VALUES (1,'a b','C:\\dir\\file');
+            /*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
+            /*!50003 SET sql_mode              = 'NO_BACKSLASH_ESCAPES' */ ;
+            DELIMITER ;;
+            /*!50003 CREATE*/ /*!50017 DEFINER=CURRENT_USER*/ /*!50003 TRIGGER notes_bi BEFORE INSERT ON notes FOR EACH ROW SET NEW.path = REPLACE(NEW.path, '\', '/') */;;
+            DELIMITER ;
+            /*!50003 SET sql_mode              = @saved_sql_mode */ ;
+            DELIMITER ;;
+            /*!50003 CREATE*/ /*!50017 DEFINER=CURRENT_USER*/ /*!50003 TRIGGER notes_bu BEFORE UPDATE ON notes FOR EACH ROW SET NEW.body = REPLACE(NEW.body, '*/', '') */;;
+            DELIMITER ;
+            /*!50001 CREATE ALGORITHM=UNDEFINED */
+            /*!50001 VIEW `v_file` AS select `notes`.`id` AS `id`,regexp_replace(`notes`.`path`,'^.*/','') AS `file` from `notes` */;
+            /*!50001 CREATE ALGORITHM=UNDEFINED */
+            /*!50001 VIEW `v_marked` AS select `notes`.`id` AS `id`,concat('/* ',`notes`.`body`,' */') AS `marked` from `notes` */;
+            CREATE TABLE zeta (id INT PRIMARY KEY);
+            INSERT INTO zeta VALUES (1),(2);
+            """#.utf8)) { $0.readChunkSize = 7 }
+
+        XCTAssertNil(viewModel.errorMessage)
+        XCTAssertEqual(viewModel.statementErrors, [])
+        let restored = try await ids(in: "zeta")
+        XCTAssertEqual(restored, [1, 2])
+        // Both triggers and both views work as their bodies say.
+        _ = try await service.rawQuery("INSERT INTO `\(database)`.notes VALUES (2, 'x', CONCAT('D:', CHAR(92), 'new'))")
+        _ = try await service.rawQuery("UPDATE `\(database)`.notes SET body = 'c */ d' WHERE id = 1")
+        let rows = try await service.query("""
+            SELECT CONCAT_WS('|', marked, file) AS r FROM `\(database)`.v_marked JOIN `\(database)`.v_file USING (id) ORDER BY id
+            """).compactMap { $0.column("r")?.string }
+        XCTAssertEqual(rows, [#"/* c  d */|C:\dir\file"#, "/* x */|new"])
+    }
+
     /// Restoring into a chosen database, the file can't switch away from
     /// it, create or drop the database it was made from.
     func testSkipsTheFilesOwnDatabaseStatementsWhenRestoringIntoAnother() async throws {

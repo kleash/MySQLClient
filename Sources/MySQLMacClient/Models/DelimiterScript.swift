@@ -225,10 +225,16 @@ enum DelimiterScript {
                 // `/*!40101 … */` (and MariaDB's `/*M! … */`) is SQL the
                 // server executes, so unlike a real comment it makes a
                 // statement on its own — mysqldump's preamble is built
-                // from exactly these.
+                // from exactly these. Its inside is read on as SQL, as the
+                // mysql client reads it: a `*/` in a string there doesn't
+                // end it, and a delimiter ends the statement.
                 let isExecutable = byte(at: index + 2) == UInt8(ascii: "!")
                     || (byte(at: index + 2) == UInt8(ascii: "M") && byte(at: index + 3) == UInt8(ascii: "!"))
-                if isExecutable, statementStart == nil { statementStart = (index, line) }
+                if isExecutable {
+                    if statementStart == nil { statementStart = (index, line) }
+                    index += 2
+                    break
+                }
                 index += 2
                 while index < count, !(bytes[index] == UInt8(ascii: "*") && byte(at: index + 1) == UInt8(ascii: "/")) {
                     if bytes[index] == UInt8(ascii: "\n") { line += 1 }
