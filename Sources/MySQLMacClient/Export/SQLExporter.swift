@@ -169,6 +169,18 @@ enum SQLExporter {
         "DELIMITER $$\n\n\(rawShowCreateRoutine)$$\n\nDELIMITER ;"
     }
 
+    /// `statement` run under the SQL mode and connection collation an object
+    /// was created under, as mysqldump does, so the restored routine,
+    /// trigger or event keeps them; the session's own are put back after.
+    static func underCreationSettings(_ statement: String, _ settings: SchemaIntrospectionService.CreationSettings) -> String {
+        """
+        SET @saved_sql_mode = @@SQL_MODE, SQL_MODE = '\(escapeStringLiteral(settings.sqlMode))';
+        SET @saved_collation_connection = @@COLLATION_CONNECTION, COLLATION_CONNECTION = '\(escapeStringLiteral(settings.collationConnection))';
+        \(statement)
+        SET SQL_MODE = @saved_sql_mode, COLLATION_CONNECTION = @saved_collation_connection;
+        """
+    }
+
     /// mysqldump's `--extended-insert`: batches rows into as few multi-row
     /// `INSERT ... VALUES (...), (...), ...;` statements as possible,
     /// starting a new statement whenever the next row would exceed either

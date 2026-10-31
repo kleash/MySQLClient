@@ -156,12 +156,35 @@ struct SchemaIntrospectionService {
     /// recompiled with fully-qualified references the way a view's `SELECT`
     /// is).
     func showCreateRoutine(_ routine: RoutineInfo) async throws -> String {
+        try await routineDefinition(routine).statement
+    }
+
+    /// What the server keeps with a routine, trigger or event besides its
+    /// text: the SQL mode and connection collation it was created under,
+    /// which apply every time it runs (`ANSI_QUOTES` changes how its body
+    /// parses, the collation how its string literals compare).
+    struct CreationSettings: Equatable {
+        let sqlMode: String
+        let collationConnection: String
+    }
+
+    /// `showCreateRoutine`, with the settings the routine was created under.
+    func routineDefinition(_ routine: RoutineInfo) async throws -> (statement: String, settings: CreationSettings) {
         let qualified = try Self.qualifiedIdentifier(database: routine.database, name: routine.name)
         let rows = try await service.query("SHOW CREATE \(routine.kind.sqlKeyword) \(qualified)")
-        guard let raw = rows.first?.column(routine.kind.createStatementColumn)?.string else {
+        guard let row = rows.first, let raw = row.column(routine.kind.createStatementColumn)?.string else {
             throw MySQLServiceError.invalidIdentifier(routine.name)
         }
-        return raw
+        return (raw, Self.creationSettings(of: row))
+    }
+
+    /// The `sql_mode` and `collation_connection` columns every `SHOW CREATE
+    /// PROCEDURE/FUNCTION/TRIGGER/EVENT` row carries.
+    static func creationSettings(of row: MySQLRow) -> CreationSettings {
+        CreationSettings(
+            sqlMode: row.column("sql_mode")?.string ?? "",
+            collationConnection: row.column("collation_connection")?.string ?? ""
+        )
     }
 
     /// `SHOW TRIGGERS FROM db` — an identifier `FROM`, not a `WHERE Db =

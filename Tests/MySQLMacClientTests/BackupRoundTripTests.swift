@@ -10,6 +10,12 @@ import XCTest
 /// routine and event, plus `CHECKSUM TABLE` and the row count of every
 /// table. The fingerprint never goes through the backup code, so a value
 /// that comes back different is caught even when the dump "looks" right.
+///
+/// Both sessions are set up unlike the server's defaults on purpose
+/// (another time zone and `ANSI_QUOTES` while reading; another time zone,
+/// `NO_BACKSLASH_ESCAPES`, zero dates refused and latin1 while restoring):
+/// a dump has to carry every setting its contents depend on, because the
+/// server it's restored on may differ.
 @MainActor
 final class BackupRoundTripTests: XCTestCase {
     private let database = "mysqlmacclient_roundtrip"
@@ -40,7 +46,14 @@ final class BackupRoundTripTests: XCTestCase {
 
     func testBackupRestoresEveryObjectAndRowExactly() async throws {
         let before = try await fingerprint()
+        // Reading in another time zone and with ANSI_QUOTES must not change
+        // what the file says.
+        _ = try await service.rawQuery("SET SESSION time_zone = '-08:00', sql_mode = 'ANSI_QUOTES'")
         try await backUp()
+        let readingSession = try await service.textQuery("SELECT @@SESSION.time_zone AS tz, @@SESSION.sql_mode AS mode").first
+        XCTAssertEqual(readingSession?.column("tz")?.string, "-08:00", "the backup must hand the session back as it found it")
+        XCTAssertEqual(readingSession?.column("mode")?.string, "ANSI_QUOTES")
+        _ = try await service.rawQuery("SET SESSION time_zone = DEFAULT, sql_mode = DEFAULT")
 
         _ = try await service.rawQuery("DROP DATABASE `\(database)`")
         try await restore()
@@ -80,18 +93,22 @@ final class BackupRoundTripTests: XCTestCase {
     }
 
     /// Replays the file statement by statement the way the `mysql` client
-    /// would, on a separate connection.
+    /// would, on a separate connection set up unlike the source server.
     private func restore() async throws {
         let target = try await connect()
         defer { Task { try? await target.disconnect() } }
+        _ = try await target.rawQuery("SET SESSION time_zone = '+05:30'")
+        _ = try await target.rawQuery("SET SESSION sql_mode = 'NO_BACKSLASH_ESCAPES,STRICT_ALL_TABLES,NO_ZERO_DATE,NO_ZERO_IN_DATE'")
+        _ = try await target.rawQuery("SET NAMES latin1")
 
+        // Carries on past a failed statement, so one run reports every
+        // statement the file gets wrong and still compares every object.
         let script = try String(contentsOf: dumpURL, encoding: .utf8)
         for statement in DelimiterScript.allStatements(from: script) {
             do {
                 _ = try await target.rawQuery(statement)
             } catch {
                 XCTFail("Restore failed at: \(statement.prefix(300))\n\(error)")
-                throw error
             }
         }
     }
@@ -170,10 +187,13 @@ final class BackupRoundTripTests: XCTestCase {
 
     /// Runs on MySQL and MariaDB alike.
     private static let corpus: [String] = [
-        // AUTO_INCREMENT: gaps and a counter above the highest id, on a
-        // primary key and on a column that isn't one.
+        // AUTO_INCREMENT: an explicit id 0 (renumbered on restore unless the
+        // dump sets NO_AUTO_VALUE_ON_ZERO), gaps, and a counter above the
+        // highest id, on a primary key and on a column that isn't one.
         "CREATE TABLE ai_counter (id INT NOT NULL AUTO_INCREMENT PRIMARY KEY, label VARCHAR(20)) AUTO_INCREMENT = 1000",
-        "INSERT INTO ai_counter VALUES (5, 'five'), (7, 'seven')",
+        "SET SESSION sql_mode = 'NO_AUTO_VALUE_ON_ZERO'",
+        "INSERT INTO ai_counter VALUES (0, 'zero'), (5, 'five'), (7, 'seven')",
+        "SET SESSION sql_mode = DEFAULT",
         "CREATE TABLE ai_not_primary (code VARCHAR(10) NOT NULL PRIMARY KEY, seq INT NOT NULL AUTO_INCREMENT, UNIQUE KEY (seq))",
         "INSERT INTO ai_not_primary VALUES ('b', 3), ('a', 9)",
 
@@ -198,7 +218,8 @@ final class BackupRoundTripTests: XCTestCase {
         "INSERT INTO float_key VALUES " + (1...20).map { "(\(Double($0) + 0.1234567))" }.joined(separator: ", "),
 
         // Dates and times: fractions of a second, TIME beyond a day and
-        // below zero, and zero dates.
+        // below zero, zero dates, and a TIMESTAMP (stored as UTC, read and
+        // written in the session's time zone).
         """
         CREATE TABLE temporal (
             id INT PRIMARY KEY, fine DATETIME(6), plain DATETIME, stamp TIMESTAMP(3) NULL, day DATE,
@@ -268,8 +289,17 @@ final class BackupRoundTripTests: XCTestCase {
         "INSERT INTO `odd``name` VALUES (1), (2)",
         "CREATE VIEW `odd``view` AS SELECT `col``tick` FROM `odd``name`",
 
-        // A view, and routines.
+        // A view, and routines: one created under modes of its own (the
+        // server keeps them with it, and ANSI_QUOTES makes "x" a name) and
+        // a connection collation that isn't the server's default.
         "CREATE VIEW positive_checks AS SELECT id, qty FROM checked WHERE qty > 0",
+        "SET SESSION sql_mode = 'ANSI_QUOTES,PIPES_AS_CONCAT', collation_connection = 'utf8mb4_unicode_ci'",
+        """
+        CREATE FUNCTION label_of(p INT) RETURNS VARCHAR(40) DETERMINISTIC
+        RETURN (SELECT 'id ' || "id" FROM "checked" WHERE "id" = p)
+        """,
+        "SET SESSION sql_mode = DEFAULT",
+        "SET NAMES utf8mb4",
         """
         CREATE PROCEDURE add_one(IN p_in INT, OUT p_out INT)
         BEGIN

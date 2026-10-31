@@ -132,6 +132,7 @@ final class DatabaseBackupViewModel: ObservableObject {
     /// Progress bookkeeping for the run in flight — see `Progress`.
     private var totalUnits = 0
     private var unitsBeforeCurrentObject = 0
+    private var savedSessionSettings: (timeZone: String, sqlMode: String)?
 
     init(service: MySQLService, database: DatabaseInfo) {
         self.service = service
@@ -406,7 +407,20 @@ final class DatabaseBackupViewModel: ObservableObject {
     /// TABLES`/`START TRANSACTION`/`COMMIT` are the same family of
     /// session-control statement, so this uses the same safe default
     /// throughout rather than assuming `execute` handles them.
+    ///
+    /// Also reads in UTC and with an empty SQL mode, as mysqldump does:
+    /// TIMESTAMP values come out in the session's time zone, and modes such
+    /// as `ANSI_QUOTES` change how `SHOW CREATE` writes a statement. The
+    /// file declares the same time zone (`writeHeader`). The connection is
+    /// shared with the rest of the app, so `endSourceSession` puts the
+    /// session's own settings back.
     private func beginSourceSession() async throws {
+        let current = try await service.textQuery("SELECT @@SESSION.time_zone AS time_zone, @@SESSION.sql_mode AS sql_mode").first
+        savedSessionSettings = (
+            timeZone: current?.column("time_zone")?.string ?? "SYSTEM",
+            sqlMode: current?.column("sql_mode")?.string ?? ""
+        )
+        _ = try await service.rawQuery("SET SESSION time_zone = '+00:00', sql_mode = ''")
         if options.source.lockTablesForReading, !selectedTables.isEmpty {
             let lockList = selectedTables.sorted { $0.name < $1.name }.map { "\(SQLExporter.quoted($0.name)) READ" }.joined(separator: ", ")
             _ = try await service.rawQuery("LOCK TABLES \(lockList)")
@@ -423,12 +437,31 @@ final class DatabaseBackupViewModel: ObservableObject {
         if options.source.useSingleTransaction {
             _ = try await service.rawQuery("COMMIT")
         }
+        if let saved = savedSessionSettings {
+            savedSessionSettings = nil
+            _ = try await service.rawQuery("""
+                SET SESSION time_zone = '\(SQLExporter.escapeStringLiteral(saved.timeZone))', \
+                sql_mode = '\(SQLExporter.escapeStringLiteral(saved.sqlMode))'
+                """)
+        }
     }
 
     // MARK: - Header / footer
 
+    /// Starts with the session settings the file's contents depend on, as
+    /// mysqldump does, because the server it's restored on may be set up
+    /// differently: the character set the file is written in, the time zone
+    /// its TIMESTAMP values are in, and an SQL mode that keeps an explicit 0
+    /// in an AUTO_INCREMENT column (instead of taking the next number) and
+    /// clears modes that would change how the file reads, such as
+    /// `NO_BACKSLASH_ESCAPES`. `writeFooter` puts them back.
     private func writeHeader(to fileHandle: FileHandle) async throws {
-        var header = ""
+        var header = """
+            SET NAMES utf8mb4;
+            SET @OLD_TIME_ZONE = @@TIME_ZONE, TIME_ZONE = '+00:00';
+            SET @OLD_SQL_MODE = @@SQL_MODE, SQL_MODE = 'NO_AUTO_VALUE_ON_ZERO';
+
+            """
         if options.file.includeCreateDatabaseStatement {
             header += "CREATE DATABASE IF NOT EXISTS \(SQLExporter.quoted(database.name));\n"
         }
@@ -443,8 +476,12 @@ final class DatabaseBackupViewModel: ObservableObject {
     }
 
     private func writeFooter(to fileHandle: FileHandle) async throws {
-        guard options.file.setForeignKeyChecksToZero else { return }
-        fileHandle.write(Data("SET FOREIGN_KEY_CHECKS=1;\n".utf8))
+        var footer = ""
+        if options.file.setForeignKeyChecksToZero {
+            footer += "SET FOREIGN_KEY_CHECKS=1;\n"
+        }
+        footer += "SET SQL_MODE = @OLD_SQL_MODE;\nSET TIME_ZONE = @OLD_TIME_ZONE;\n"
+        fileHandle.write(Data(footer.utf8))
     }
 
     // MARK: - Per-object dump
@@ -621,9 +658,9 @@ final class DatabaseBackupViewModel: ObservableObject {
         if options.file.includeDropStatements {
             fileHandle.write(Data((SQLExporter.dropRoutineStatement(routine) + "\n").utf8))
         }
-        let rawDDL = try await introspection.showCreateRoutine(routine)
-        let wrapped = SQLExporter.delimiterWrappedRoutineStatement(rawShowCreateRoutine: rawDDL)
-        fileHandle.write(Data((wrapped + "\n\n").utf8))
+        let definition = try await introspection.routineDefinition(routine)
+        let wrapped = SQLExporter.delimiterWrappedRoutineStatement(rawShowCreateRoutine: definition.statement)
+        fileHandle.write(Data((SQLExporter.underCreationSettings(wrapped, definition.settings) + "\n\n").utf8))
     }
 
     private func describe(_ error: Error) -> String {
