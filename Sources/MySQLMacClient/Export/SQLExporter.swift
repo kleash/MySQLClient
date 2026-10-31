@@ -154,10 +154,12 @@ enum SQLExporter {
         rows: [[RowValue]],
         to fileHandle: FileHandle
     ) throws {
-        fileHandle.write(Data((createTableSQL + "\n\n").utf8))
+        // `write(contentsOf:)`, which throws when the write fails (a full
+        // disk); `write(_:)` raises an Objective-C exception instead.
+        try fileHandle.write(contentsOf: Data((createTableSQL + "\n\n").utf8))
         for row in rows {
             let statement = insertStatement(database: database, table: table, columns: columns, values: row)
-            fileHandle.write(Data((statement + "\n").utf8))
+            try fileHandle.write(contentsOf: Data((statement + "\n").utf8))
         }
     }
 

@@ -707,7 +707,7 @@ final class DatabaseBackupViewModel: ObservableObject {
             if !wroteAnyRows {
                 wroteAnyRows = true
                 if options.file.lockInsertStatements {
-                    fileHandle.write(Data("LOCK TABLES \(SQLExporter.quoted(table.name)) WRITE;\n".utf8))
+                    try fileHandle.write(contentsOf: Data("LOCK TABLES \(SQLExporter.quoted(table.name)) WRITE;\n".utf8))
                 }
             }
 
@@ -717,8 +717,11 @@ final class DatabaseBackupViewModel: ObservableObject {
                 literalRows: rows,
                 maxRowsPerStatement: options.file.useExtendedInserts ? 500 : 1
             )
+            // `write(contentsOf:)` throws when the disk is full, so the
+            // backup stops with an error and its temporary file is removed;
+            // `write(_:)` raises an Objective-C exception, which crashes.
             for statement in statements {
-                fileHandle.write(Data((statement + "\n").utf8))
+                try fileHandle.write(contentsOf: Data((statement + "\n").utf8))
             }
 
             rowsWritten += rows.count
@@ -746,9 +749,9 @@ final class DatabaseBackupViewModel: ObservableObject {
 
         guard wroteAnyRows else { return }
         if options.file.lockInsertStatements {
-            fileHandle.write(Data("UNLOCK TABLES;\n".utf8))
+            try fileHandle.write(contentsOf: Data("UNLOCK TABLES;\n".utf8))
         }
-        fileHandle.write(Data("\n".utf8))
+        try fileHandle.write(contentsOf: Data("\n".utf8))
     }
 
     /// Before the first view, every selected view is created as a stand-in

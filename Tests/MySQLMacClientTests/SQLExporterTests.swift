@@ -84,6 +84,22 @@ final class SQLExporterTests: XCTestCase {
         XCTAssertTrue(contents.contains("INSERT INTO `testdb`.`widgets` (`id`) VALUES (2);"))
     }
 
+    /// A write that fails, as on a full disk (here the handle is open only
+    /// for reading), has to throw so the caller can clean up and say so.
+    /// `FileHandle.write(_:)` raises an Objective-C exception instead, which
+    /// nothing catches.
+    func testWriteThrowsWhenTheFileCannotBeWritten() throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID().uuidString).sql")
+        FileManager.default.createFile(atPath: url.path, contents: nil)
+        defer { try? FileManager.default.removeItem(at: url) }
+        let handle = try FileHandle(forReadingFrom: url)
+        defer { try? handle.close() }
+
+        XCTAssertThrowsError(try SQLExporter.write(
+            database: "testdb", table: "widgets", createTableSQL: "", columns: [columns[0]], rows: [[.int(1)]], to: handle
+        ))
+    }
+
     // MARK: - Database Backup
 
     func testDropTableStatementEmitsDropIfExists() {
