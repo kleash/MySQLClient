@@ -402,6 +402,7 @@ final class DatabaseRestoreViewModel: ObservableObject {
         var readSize = chunkSize
         var reachedEnd = false
         var asked = false
+        var filesDatabase: String?
         repeat {
             // After a statement that mentions sql_mode, what's left is split
             // the way the client now reads backslashes, before more is read.
@@ -417,6 +418,15 @@ final class DatabaseRestoreViewModel: ObservableObject {
             for statement in scanned.statements where !keepingDatabaseStatements {
                 let original = pending[statement.range]
                 let sql = String(decoding: original, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
+                if let name = databaseName(in: sql) {
+                    // As in `performRestore`: a second database would land
+                    // on the first one's tables. What's before it still runs.
+                    if let filesDatabase, name != filesDatabase {
+                        try input.write(contentsOf: whole + pending[copied..<statement.range.lowerBound])
+                        throw RestoreError.moreThanOneDatabase(line: statement.line + 1)
+                    }
+                    filesDatabase = name
+                }
                 let replacement = intoChosenDatabase(sql)
                 guard replacement != sql else { continue }
                 // Left out, or rewritten, but only from bytes that are exactly

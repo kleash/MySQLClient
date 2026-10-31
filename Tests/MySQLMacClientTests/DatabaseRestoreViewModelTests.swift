@@ -539,4 +539,30 @@ final class DatabaseRestoreViewModelTests: XCTestCase {
         let original = try await service.query("SELECT id FROM `\(other)`.t").compactMap { $0.column("id")?.int }
         XCTAssertEqual(original, [], "the file's own database must be left alone")
     }
+
+    /// As the built-in restore does: a file of several databases can't go
+    /// into one, where each database's DROP TABLE would replace the table
+    /// restored from the one before. It stops where the second one starts,
+    /// even when told to carry on past failed statements.
+    func testMysqlClientStopsWhereTheFileMovesOnToAnotherDatabase() async throws {
+        let second = "\(other)_b"
+        addTeardownBlock { [service] in _ = try? await service?.rawQuery("DROP DATABASE IF EXISTS `\(second)`") }
+        let viewModel = try await restoreWithTheMysqlClient(Data("""
+            CREATE DATABASE /*!32312 IF NOT EXISTS*/ `\(other)` /*!40100 DEFAULT CHARACTER SET latin1 COLLATE latin1_general_ci */;
+            USE `\(other)`;
+            DROP TABLE IF EXISTS `t`;
+            CREATE TABLE `t` (id INT PRIMARY KEY);
+            INSERT INTO `t` VALUES (1),(2);
+            CREATE DATABASE /*!32312 IF NOT EXISTS*/ `\(second)` /*!40100 DEFAULT CHARACTER SET utf8mb4 */;
+            USE `\(second)`;
+            DROP TABLE IF EXISTS `t`;
+            CREATE TABLE `t` (id INT PRIMARY KEY);
+            INSERT INTO `t` VALUES (3);
+            """.utf8)) { $0.stopOnFirstError = false }
+
+        XCTAssertEqual(viewModel.errorMessage, DatabaseRestoreViewModel.RestoreError.moreThanOneDatabase(line: 6).errorDescription)
+        XCTAssertFalse(viewModel.didFinishSuccessfully)
+        let restored = try await ids(in: "t")
+        XCTAssertEqual(restored, [1, 2])
+    }
 }
