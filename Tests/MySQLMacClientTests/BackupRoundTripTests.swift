@@ -85,6 +85,31 @@ final class BackupRoundTripTests: XCTestCase {
         assertSame(restored, original)
     }
 
+    /// Each page of a composite key is read as a range of the key's index:
+    /// about one row read per row written. Reading every page from the start
+    /// of the key (MariaDB does that for `(a, b) > (x, y)`) or sorting the
+    /// table for each page (ordering by the columns in table order instead
+    /// of the key's does that) reads tens of times more.
+    func testPagesOfACompositeKeyAreRangesOfItsIndex() async throws {
+        let viewModel = DatabaseBackupViewModel(service: service, database: DatabaseInfo(name: database))
+        await viewModel.loadDatabasesAndObjects()
+        viewModel.selectNoObjects()
+        viewModel.selectedTables = Set(viewModel.allTables.filter { $0.name == "reversed_key" })
+        viewModel.options.mode = .dataOnly
+        viewModel.dataPageSize = 7
+        viewModel.outputFileURL = dumpURL
+        viewModel.outputLocationIsGranted = true
+        _ = try await service.rawQuery("FLUSH STATUS")
+        viewModel.startBackup()
+        while viewModel.isRunning { await Task.yield() }
+        XCTAssertNil(viewModel.errorMessage)
+
+        let reads = try await service.textQuery("SHOW SESSION STATUS WHERE Variable_name IN ('Handler_read_next', 'Handler_read_rnd_next')")
+            .compactMap { $0.column("Value")?.string.flatMap { Int($0) } }
+            .reduce(0, +)
+        XCTAssertLessThan(reads, 7_000, "700 rows")
+    }
+
     private func assertSame(_ actual: [String: String], _ expected: [String: String], file: StaticString = #filePath, line: UInt = #line) {
         for key in Set(expected.keys).union(actual.keys).sorted() {
             XCTAssertEqual(actual[key], expected[key], key, file: file, line: line)
@@ -348,6 +373,10 @@ final class BackupRoundTripTests: XCTestCase {
         "INSERT INTO bit_key VALUES " + (1...20).map { "(\($0 * 300))" }.joined(separator: ", "),
         "CREATE TABLE int_bit_key (a INT, f BIT(1), PRIMARY KEY (a, f))",
         "INSERT INTO int_bit_key VALUES " + (1...10).map { "(\($0), 0), (\($0), 1)" }.joined(separator: ", "),
+        // A composite key in another order than its columns, over 100 pages
+        // (see testPagesOfACompositeKeyAreRangesOfItsIndex).
+        "CREATE TABLE reversed_key (a INT, b INT, PRIMARY KEY (b, a))",
+        "INSERT INTO reversed_key VALUES " + (0..<700).map { "(\($0 / 10), \($0 % 10))" }.joined(separator: ", "),
 
         // ---- End of values and paging, continued ----
 

@@ -635,8 +635,9 @@ final class DatabaseBackupViewModel: ObservableObject {
                 : SQLExporter.quoted(column.name)
         }.joined(separator: ", ")
 
-        let keyColumns = allColumns.filter(\.isPrimaryKey)
-        let keyColumnNames = keyColumns.map(\.name)
+        // In the key's own order, not the table's, so ORDER BY walks its
+        // index instead of sorting the table.
+        let keyColumnNames = try await introspection.primaryKeyColumnNames(forTable: table.name, inDatabase: database.name)
         // Resolved once: which positions in a fetched row carry the key
         // values that seed the next page's `WHERE`.
         let keyIndexes = keyColumnNames.compactMap { key in columns.firstIndex { $0.name == key } }
@@ -644,9 +645,9 @@ final class DatabaseBackupViewModel: ObservableObject {
         // differently with the 'text' or X'..' a seek would start from, so
         // a page would skip or repeat rows (or, for BIT, never end).
         let canSeekByKey = !keyColumnNames.isEmpty && keyIndexes.count == keyColumnNames.count
-            && !keyColumns.contains { ["enum", "set", "bit"].contains(where: $0.mysqlType.lowercased().hasPrefix) }
-        let quotedKeyList = keyColumnNames.map(SQLExporter.quoted).joined(separator: ", ")
-        let orderList = keyColumnNames.isEmpty ? selectList : quotedKeyList
+            && !keyIndexes.contains { ["enum", "set", "bit"].contains(where: columns[$0].mysqlType.lowercased().hasPrefix) }
+        let quotedKeys = keyColumnNames.map(SQLExporter.quoted)
+        let orderList = keyColumnNames.isEmpty ? selectList : quotedKeys.joined(separator: ", ")
 
         var lastKeyLiterals: [String]?
         var offset = 0
@@ -658,10 +659,14 @@ final class DatabaseBackupViewModel: ObservableObject {
 
             var sql = "SELECT \(selectList) FROM \(qualifiedTable)"
             if canSeekByKey, let lastKeyLiterals {
-                // Row-constructor comparison, so a composite key pages
-                // correctly as one ordered tuple rather than needing a
-                // hand-expanded chain of ORs.
-                sql += " WHERE (\(quotedKeyList)) > (\(lastKeyLiterals.joined(separator: ", ")))"
+                // (a, b) > (x, y) written out as (a > x) OR (a = x AND b > y):
+                // MariaDB reads that as a range of the key's index, but the
+                // row comparison by scanning the key from its start, which
+                // makes every page cost as much as all the pages before it.
+                let after = quotedKeys.indices.map { column in
+                    (0..<column).map { "\(quotedKeys[$0]) = \(lastKeyLiterals[$0])" } + ["\(quotedKeys[column]) > \(lastKeyLiterals[column])"]
+                }
+                sql += " WHERE " + after.map { "(" + $0.joined(separator: " AND ") + ")" }.joined(separator: " OR ")
             }
             sql += " ORDER BY \(orderList) LIMIT \(dataPageSize)"
             if !canSeekByKey {
