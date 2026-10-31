@@ -51,6 +51,7 @@ final class DatabaseBackupViewModelTests: XCTestCase {
         for name in scratchDatabases {
             _ = try? await service.rawQuery("DROP DATABASE IF EXISTS `\(name)`")
         }
+        _ = try? await service.rawQuery("DROP USER IF EXISTS 'mysqlmacclient_noevent'@'%'")
         try await service.disconnect()
     }
 
@@ -141,6 +142,28 @@ final class DatabaseBackupViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.allFunctions, [])
         XCTAssertNotNil(viewModel.loadWarning, "engellemeyen bir uyarı olarak raporlanmalı")
         XCTAssertNil(viewModel.errorMessage, "yükleme uyarısı, çalıştırma hatasıyla karıştırılmamalı")
+    }
+
+    /// Listing events takes the EVENT privilege, which a user who can read
+    /// everything else may lack: they still get every trigger.
+    func testLoadObjectsListsTriggersForAUserWhoCantListEvents() async throws {
+        let scratch = try await makeScratchDatabase("mysqlmacclient_backup_noevent", [
+            "CREATE TABLE t (id INT PRIMARY KEY)",
+            "CREATE TRIGGER t_bi BEFORE INSERT ON t FOR EACH ROW SET NEW.id = NEW.id",
+        ])
+        _ = try await service.rawQuery("DROP USER IF EXISTS 'mysqlmacclient_noevent'@'%'")
+        _ = try await service.rawQuery("CREATE USER 'mysqlmacclient_noevent'@'%' IDENTIFIED BY 'no-event'")
+        _ = try await service.rawQuery("GRANT SELECT, SHOW VIEW, TRIGGER ON `mysqlmacclient_backup_noevent`.* TO 'mysqlmacclient_noevent'@'%'")
+        let restricted = MySQLService()
+        try await restricted.connect(host: TestDatabase.host, port: TestDatabase.port, username: "mysqlmacclient_noevent", password: "no-event", database: nil)
+
+        let viewModel = DatabaseBackupViewModel(service: restricted, database: scratch)
+        await viewModel.loadDatabasesAndObjects()
+        try await restricted.disconnect()
+
+        XCTAssertEqual(viewModel.allTriggers.map(\.name), ["t_bi"])
+        XCTAssertEqual(viewModel.selectedTriggers.map(\.name), ["t_bi"])
+        XCTAssertNotNil(viewModel.loadWarning, "the events that couldn't be listed")
     }
 
     func testSelectNoneThenSelectAllRestoresFullSelection() async throws {

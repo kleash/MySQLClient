@@ -248,20 +248,28 @@ final class DatabaseBackupViewModel: ObservableObject {
             loadWarning = String(localized: "Could not load the procedure/function list; tables and views were loaded: \(describe(error))")
         }
 
-        // Same reasoning, separately: listing events takes the EVENT
-        // privilege, which a user who can read everything else may lack.
-        do {
-            allTriggers = try await introspection.listTriggers(inDatabase: database.name)
-            allEvents = try await introspection.listEvents(inDatabase: database.name)
-            selectedTriggers = Set(allTriggers)
-            selectedEvents = Set(allEvents)
-        } catch {
-            allTriggers = []
-            allEvents = []
-            selectedTriggers = []
-            selectedEvents = []
+        // Same reasoning, and triggers apart from events: listing events
+        // takes the EVENT privilege, which a user who can read everything
+        // else may lack.
+        func noteListFailure(_ error: Error) {
             let warning = String(localized: "Could not load the trigger/event list; the other objects were loaded: \(describe(error))")
             loadWarning = [loadWarning, warning].compactMap { $0 }.joined(separator: "\n")
+        }
+        do {
+            allTriggers = try await introspection.listTriggers(inDatabase: database.name)
+            selectedTriggers = Set(allTriggers)
+        } catch {
+            allTriggers = []
+            selectedTriggers = []
+            noteListFailure(error)
+        }
+        do {
+            allEvents = try await introspection.listEvents(inDatabase: database.name)
+            selectedEvents = Set(allEvents)
+        } catch {
+            allEvents = []
+            selectedEvents = []
+            noteListFailure(error)
         }
     }
 
