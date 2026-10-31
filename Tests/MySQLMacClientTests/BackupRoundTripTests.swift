@@ -27,7 +27,9 @@ final class BackupRoundTripTests: XCTestCase {
     override func setUp() async throws {
         dumpURL = FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID().uuidString).sql")
         service = try await connect()
+        // Both, in case a run that was stopped never got to tearDown.
         _ = try await service.rawQuery("DROP DATABASE IF EXISTS `\(database)`")
+        _ = try await service.rawQuery("DROP DATABASE IF EXISTS `\(copy)`")
         _ = try await service.rawQuery("CREATE DATABASE `\(database)` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci")
         _ = try await service.rawQuery("USE `\(database)`")
         let isMariaDB = await service.serverVersion?.contains("MariaDB") ?? false
@@ -81,6 +83,31 @@ final class BackupRoundTripTests: XCTestCase {
         }
         _ = try await service.rawQuery("CREATE DATABASE `\(copy)` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci")
         try await restore(into: copy)
+
+        assertSame(try await fingerprint(of: database), before)
+        var restored = try await fingerprint(of: copy)
+        var original = before
+        restored["database"] = nil
+        original["database"] = nil
+        assertSame(restored, original)
+    }
+
+    /// The app's own restore (`DatabaseRestoreViewModel`) of a default
+    /// backup, into another database: it has to skip the file's USE and
+    /// CREATE DATABASE, and come out the same reading the file in chunks
+    /// small enough to cut every statement, string and character.
+    func testBackupRestoredWithTheAppIntoAnotherDatabaseMatchesTheOriginal() async throws {
+        let before = try await fingerprint(of: database)
+        try await backUp()
+        _ = try await service.rawQuery("CREATE DATABASE `\(copy)` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci")
+
+        let restore = DatabaseRestoreViewModel(service: service, database: DatabaseInfo(name: copy))
+        restore.inputFileURL = dumpURL
+        restore.readChunkSize = 7
+        restore.startRestore()
+        while restore.isRunning { await Task.yield() }
+        XCTAssertNil(restore.errorMessage)
+        XCTAssertEqual(restore.statementErrors, [])
 
         assertSame(try await fingerprint(of: database), before)
         var restored = try await fingerprint(of: copy)

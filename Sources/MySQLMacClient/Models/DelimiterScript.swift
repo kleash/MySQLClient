@@ -235,9 +235,10 @@ enum DelimiterScript {
     /// ever cut at a delimiter, never inside a multi-byte character, and
     /// the caller decides how strictly to decode it.
     ///
-    /// shortcut: a statement longer than the chunks it arrives in is
-    /// scanned again from its start with each chunk; fine for dump-sized
-    /// statements (a few MB), slow for a single statement of hundreds of MB.
+    /// A statement longer than the chunks it arrives in is scanned again
+    /// from its start with each chunk, so a caller reading a file should
+    /// grow its reads while no statement ends (`DatabaseRestoreViewModel`
+    /// doubles them).
     struct Splitter {
         private var pending: [UInt8] = []
         private var state = ScanState()

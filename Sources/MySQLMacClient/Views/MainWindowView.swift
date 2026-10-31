@@ -237,6 +237,7 @@ struct MainWindowView: View {
     @State private var tableToExport: TableInfo?
     @State private var tableToImport: TableInfo?
     @State private var databaseToBackUp: DatabaseInfo?
+    @State private var databaseToRestore: DatabaseInfo?
     @State private var routinePendingDrop: RoutineInfo?
     @State private var triggerPendingDrop: TriggerInfo?
     @State private var eventPendingDrop: EventInfo?
@@ -431,6 +432,9 @@ struct MainWindowView: View {
         .sheet(item: $databaseToBackUp) { database in
             DatabaseBackupView(service: session.mysqlService, database: database)
         }
+        .sheet(item: $databaseToRestore) { database in
+            DatabaseRestoreView(service: session.mysqlService, database: database)
+        }
         .modifier(DropConfirmations(
             tablePendingTruncate: $tablePendingTruncate,
             tablePendingDrop: $tablePendingDrop,
@@ -479,6 +483,7 @@ struct MainWindowView: View {
                 namedObjectCreationRequest = NamedObjectCreationRequest(kind: .event, database: database)
             },
             onBackupDatabase: { databaseToBackUp = $0 },
+            onRestoreDatabase: { databaseToRestore = $0 },
             onTruncateTable: { tablePendingTruncate = $0 },
             onDropTable: { tablePendingDrop = $0 },
             onInsertQueryTemplate: { table, kind in

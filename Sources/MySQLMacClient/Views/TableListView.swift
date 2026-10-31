@@ -42,6 +42,7 @@ struct TableListView: View {
     let onCreateTrigger: (String) -> Void
     let onCreateEvent: (String) -> Void
     let onBackupDatabase: (DatabaseInfo) -> Void
+    let onRestoreDatabase: (DatabaseInfo) -> Void
     let onTruncateTable: (TableInfo) -> Void
     let onDropTable: (TableInfo) -> Void
     let onInsertQueryTemplate: (TableInfo, SQLTemplate.Kind) -> Void
@@ -89,6 +90,7 @@ struct TableListView: View {
                             onCreateTrigger: onCreateTrigger,
                             onCreateEvent: onCreateEvent,
                             onBackupDatabase: onBackupDatabase,
+                            onRestoreDatabase: onRestoreDatabase,
                             onTruncateTable: onTruncateTable,
                             onDropTable: onDropTable,
                             onInsertQueryTemplate: onInsertQueryTemplate,
@@ -332,6 +334,7 @@ private struct DatabaseRow: View {
     let onCreateTrigger: (String) -> Void
     let onCreateEvent: (String) -> Void
     let onBackupDatabase: (DatabaseInfo) -> Void
+    let onRestoreDatabase: (DatabaseInfo) -> Void
     let onTruncateTable: (TableInfo) -> Void
     let onDropTable: (TableInfo) -> Void
     let onInsertQueryTemplate: (TableInfo, SQLTemplate.Kind) -> Void
@@ -537,6 +540,9 @@ private struct DatabaseRow: View {
 
         Button("Backup...") {
             onBackupDatabase(node.info)
+        }
+        Button("Restore...") {
+            onRestoreDatabase(node.info)
         }
     }
 }

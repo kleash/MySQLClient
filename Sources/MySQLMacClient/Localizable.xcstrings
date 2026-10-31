@@ -221,6 +221,113 @@
         }
       }
     },
+    "%@ was restored.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تمت استعادة %@."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ wurde wiederhergestellt."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ se restauró."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ a été restauré."
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ रीस्टोर हो गया।"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ telah dipulihkan."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ è stato ripristinato."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ を復元しました。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@이(가) 복원되었습니다."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Przywrócono %@."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ foi restaurado."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ восстановлен."
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "กู้คืน %@ แล้ว"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ geri yüklendi."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đã khôi phục %@."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已恢复 %@。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已還原 %@。"
+          }
+        }
+      }
+    },
     "%@@%@:%lld%@": {
       "extractionState": "manual"
     },
@@ -1312,6 +1419,113 @@
           "stringUnit": {
             "state": "translated",
             "value": "已執行 %lld 條語句。%@"
+          }
+        }
+      }
+    },
+    "%lld statements run": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تم تشغيل %lld عبارة"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld Anweisungen ausgeführt"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld sentencias ejecutadas"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld instructions exécutées"
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld स्टेटमेंट चलाए गए"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld pernyataan dijalankan"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld istruzioni eseguite"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 文を実行"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld개 문 실행됨"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wykonano instrukcji: %lld"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld instruções executadas"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Выполнено операторов: %lld"
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "รันแล้ว %lld คำสั่ง"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld ifade çalıştırıldı"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đã chạy %lld câu lệnh"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已运行 %lld 条语句"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已執行 %lld 個陳述式"
           }
         }
       }
@@ -2503,6 +2717,113 @@
           "stringUnit": {
             "state": "translated",
             "value": "-- 輸入表格名稱與至少一個欄位名稱後，SQL 將顯示於此 --"
+          }
+        }
+      }
+    },
+    "A SQL file can't be undone as a whole: if the restore stops part-way, the statements before that point stay restored.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "لا يمكن التراجع عن ملف SQL دفعة واحدة: إذا توقفت الاستعادة في منتصفها، تبقى العبارات التي سبقت تلك النقطة مستعادة."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eine SQL-Datei lässt sich nicht als Ganzes rückgängig machen: Bricht die Wiederherstellung unterwegs ab, bleiben die Anweisungen davor wiederhergestellt."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Un archivo SQL no se puede deshacer en conjunto: si la restauración se detiene a medias, las sentencias anteriores a ese punto quedan restauradas."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Un fichier SQL ne peut pas être annulé dans son ensemble : si la restauration s'arrête en cours de route, les instructions précédant ce point restent restaurées."
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "SQL फ़ाइल को पूरी तरह पूर्ववत नहीं किया जा सकता: अगर रीस्टोर बीच में रुक जाए, तो उस बिंदु से पहले के स्टेटमेंट रीस्टोर ही रहते हैं।"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "File SQL tidak bisa dibatalkan sekaligus: jika pemulihan berhenti di tengah jalan, pernyataan sebelum titik itu tetap terpulihkan."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Un file SQL non si può annullare per intero: se il ripristino si interrompe a metà, le istruzioni precedenti restano ripristinate."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "SQL ファイルはまとめて取り消せません。復元が途中で止まった場合、それより前の文は復元されたまま残ります。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "SQL 파일은 전체를 한 번에 되돌릴 수 없습니다. 복원이 중간에 멈추면 그 이전의 문은 복원된 상태로 남습니다."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pliku SQL nie da się cofnąć w całości: jeśli przywracanie zatrzyma się w połowie, instrukcje sprzed tego miejsca pozostaną przywrócone."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Um arquivo SQL não pode ser desfeito como um todo: se a restauração parar no meio, as instruções anteriores a esse ponto continuam restauradas."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "SQL-файл нельзя отменить целиком: если восстановление остановится на середине, операторы до этого места останутся выполненными."
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ไฟล์ SQL ไม่สามารถย้อนกลับทั้งหมดได้ หากการกู้คืนหยุดกลางทาง คำสั่งก่อนจุดนั้นจะยังคงถูกกู้คืนไว้"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bir SQL dosyası bütün olarak geri alınamaz: geri yükleme yarıda kalırsa o noktadan önceki ifadeler geri yüklenmiş olarak kalır."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Không thể hoàn tác toàn bộ một tệp SQL: nếu quá trình khôi phục dừng giữa chừng, các câu lệnh trước điểm đó vẫn được giữ."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "SQL 文件无法整体撤销：如果恢复中途停止，此前的语句会保持已恢复的状态。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "SQL 檔案無法整體復原：如果還原中途停止，之前的陳述式會保持已還原的狀態。"
           }
         }
       }
@@ -14087,6 +14408,113 @@
         }
       }
     },
+    "FAILED STATEMENTS": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "العبارات الفاشلة"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "FEHLGESCHLAGENE ANWEISUNGEN"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "SENTENCIAS FALLIDAS"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "INSTRUCTIONS EN ÉCHEC"
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "विफल स्टेटमेंट"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PERNYATAAN GAGAL"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ISTRUZIONI NON RIUSCITE"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "失敗した文"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "실패한 문"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "NIEUDANE INSTRUKCJE"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "INSTRUÇÕES COM FALHA"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "НЕУДАЧНЫЕ ОПЕРАТОРЫ"
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "คำสั่งที่ล้มเหลว"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "BAŞARISIZ İFADELER"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "CÂU LỆNH LỖI"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "失败的语句"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "失敗的陳述式"
+          }
+        }
+      }
+    },
     "FIELDS TO EXPORT": {
       "extractionState": "manual",
       "localizations": {
@@ -14511,6 +14939,113 @@
           "stringUnit": {
             "state": "translated",
             "value": "篩選值"
+          }
+        }
+      }
+    },
+    "Finished with %lld failed statements, listed below. Every other statement was restored.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "اكتملت مع %lld عبارة فاشلة مدرجة أدناه. تمت استعادة كل العبارات الأخرى."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mit %lld fehlgeschlagenen Anweisungen beendet (siehe unten). Alle anderen Anweisungen wurden wiederhergestellt."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terminó con %lld sentencias fallidas, listadas abajo. Todas las demás sentencias se restauraron."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terminé avec %lld instructions en échec, listées ci-dessous. Toutes les autres instructions ont été restaurées."
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld विफल स्टेटमेंट के साथ पूरा हुआ, जो नीचे दिए गए हैं। बाकी सभी स्टेटमेंट रीस्टोर हो गए।"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Selesai dengan %lld pernyataan gagal, tercantum di bawah. Semua pernyataan lain telah dipulihkan."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terminato con %lld istruzioni non riuscite, elencate qui sotto. Tutte le altre istruzioni sono state ripristinate."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 件の文が失敗して終了しました（下に一覧）。その他の文はすべて復元されています。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "실패한 문 %lld개와 함께 완료되었습니다(아래 목록). 나머지 문은 모두 복원되었습니다."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zakończono z nieudanymi instrukcjami (%lld), wymienionymi poniżej. Wszystkie pozostałe instrukcje zostały przywrócone."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Concluído com %lld instruções com falha, listadas abaixo. Todas as outras instruções foram restauradas."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Завершено с неудачными операторами (%lld), они перечислены ниже. Все остальные операторы восстановлены."
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "เสร็จสิ้นโดยมี %lld คำสั่งที่ล้มเหลว ตามรายการด้านล่าง คำสั่งอื่นทั้งหมดถูกกู้คืนแล้ว"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld başarısız ifadeyle tamamlandı, aşağıda listelendi. Diğer tüm ifadeler geri yüklendi."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hoàn tất với %lld câu lệnh lỗi, liệt kê bên dưới. Mọi câu lệnh khác đã được khôi phục."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已完成，有 %lld 条语句失败（见下方列表）。其他所有语句均已恢复。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已完成，有 %lld 個陳述式失敗（見下方清單）。其他所有陳述式皆已還原。"
           }
         }
       }
@@ -19547,6 +20082,220 @@
         }
       }
     },
+    "Line %lld isn't UTF-8 text, so it can't be sent to the server unchanged. A mysqldump file made without --hex-blob can hold raw binary data like this: restore it with the mysql client, or make the dump with --hex-blob.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "السطر %lld ليس نصًا بترميز UTF-8، لذا لا يمكن إرساله إلى الخادم دون تغيير. قد يحتوي ملف mysqldump أُنشئ دون --hex-blob على بيانات ثنائية خام كهذه: استعده باستخدام عميل mysql، أو أنشئ التفريغ باستخدام --hex-blob."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zeile %lld ist kein UTF-8-Text und kann daher nicht unverändert an den Server gesendet werden. Eine mysqldump-Datei ohne --hex-blob kann solche Binärdaten enthalten: Stellen Sie sie mit dem mysql-Client wieder her oder erstellen Sie den Dump mit --hex-blob."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La línea %lld no es texto UTF-8, así que no se puede enviar al servidor sin alterarla. Un archivo de mysqldump creado sin --hex-blob puede contener datos binarios así: restáuralo con el cliente mysql o crea el volcado con --hex-blob."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La ligne %lld n'est pas du texte UTF-8 et ne peut donc pas être envoyée telle quelle au serveur. Un fichier mysqldump créé sans --hex-blob peut contenir des données binaires de ce type : restaurez-le avec le client mysql, ou créez le dump avec --hex-blob."
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "पंक्ति %lld UTF-8 टेक्स्ट नहीं है, इसलिए इसे बिना बदले सर्वर पर नहीं भेजा जा सकता। --hex-blob के बिना बनी mysqldump फ़ाइल में ऐसा कच्चा बाइनरी डेटा हो सकता है: इसे mysql क्लाइंट से रीस्टोर करें, या डंप --hex-blob के साथ बनाएँ।"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baris %lld bukan teks UTF-8, sehingga tidak bisa dikirim ke server tanpa diubah. File mysqldump yang dibuat tanpa --hex-blob bisa berisi data biner mentah seperti ini: pulihkan dengan klien mysql, atau buat dump dengan --hex-blob."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La riga %lld non è testo UTF-8, quindi non può essere inviata al server senza alterarla. Un file mysqldump creato senza --hex-blob può contenere dati binari di questo tipo: ripristinalo con il client mysql, oppure crea il dump con --hex-blob."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 行目は UTF-8 テキストではないため、そのままサーバーに送れません。--hex-blob を付けずに作った mysqldump ファイルには、このような生のバイナリデータが含まれることがあります。mysql クライアントで復元するか、--hex-blob を付けてダンプを作り直してください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld행은 UTF-8 텍스트가 아니어서 변경 없이 서버로 보낼 수 없습니다. --hex-blob 없이 만든 mysqldump 파일에는 이런 원시 바이너리 데이터가 들어 있을 수 있습니다. mysql 클라이언트로 복원하거나 --hex-blob으로 덤프를 만드세요."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wiersz %lld nie jest tekstem UTF-8, więc nie można go wysłać do serwera bez zmian. Plik mysqldump utworzony bez --hex-blob może zawierać takie surowe dane binarne: przywróć go klientem mysql albo utwórz zrzut z --hex-blob."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A linha %lld não é texto UTF-8, então não pode ser enviada ao servidor sem alteração. Um arquivo do mysqldump criado sem --hex-blob pode conter dados binários assim: restaure-o com o cliente mysql ou gere o dump com --hex-blob."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Строка %lld не является текстом UTF-8, поэтому её нельзя отправить на сервер без изменений. Файл mysqldump, созданный без --hex-blob, может содержать такие двоичные данные: восстановите его клиентом mysql или создайте дамп с --hex-blob."
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "บรรทัด %lld ไม่ใช่ข้อความ UTF-8 จึงส่งไปยังเซิร์ฟเวอร์โดยไม่เปลี่ยนแปลงไม่ได้ ไฟล์ mysqldump ที่สร้างโดยไม่ใช้ --hex-blob อาจมีข้อมูลไบนารีดิบแบบนี้ ให้กู้คืนด้วยไคลเอนต์ mysql หรือสร้างดัมป์ด้วย --hex-blob"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Satır %lld UTF-8 metin değil, bu yüzden sunucuya değiştirilmeden gönderilemez. --hex-blob olmadan oluşturulmuş bir mysqldump dosyası böyle ham ikili veri içerebilir: mysql istemcisiyle geri yükleyin ya da dökümü --hex-blob ile oluşturun."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dòng %lld không phải văn bản UTF-8 nên không thể gửi nguyên vẹn đến máy chủ. Tệp mysqldump tạo mà không có --hex-blob có thể chứa dữ liệu nhị phân thô như vậy: hãy khôi phục bằng trình khách mysql, hoặc tạo bản dump với --hex-blob."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "第 %lld 行不是 UTF-8 文本，无法原样发送到服务器。未使用 --hex-blob 生成的 mysqldump 文件可能包含这样的原始二进制数据：请用 mysql 客户端恢复，或使用 --hex-blob 重新生成转储。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "第 %lld 行不是 UTF-8 文字，無法原封不動送到伺服器。未使用 --hex-blob 產生的 mysqldump 檔案可能包含這類原始二進位資料：請用 mysql 用戶端還原，或使用 --hex-blob 重新產生傾印。"
+          }
+        }
+      }
+    },
+    "Line %lld: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "السطر %lld: %@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zeile %lld: %@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Línea %lld: %@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ligne %lld : %@"
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "पंक्ति %lld: %@"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baris %lld: %@"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Riga %lld: %@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 行目: %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld행: %@"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wiersz %lld: %@"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Linha %lld: %@"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Строка %lld: %@"
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "บรรทัด %lld: %@"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Satır %lld: %@"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dòng %lld: %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "第 %lld 行：%@"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "第 %lld 行：%@"
+          }
+        }
+      }
+    },
     "Loading columns…": {
       "extractionState": "manual",
       "localizations": {
@@ -23399,6 +24148,113 @@
         }
       }
     },
+    "OPTIONS": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "الخيارات"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OPTIONEN"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OPCIONES"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OPTIONS"
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "विकल्प"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OPSI"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OPZIONI"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "オプション"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "옵션"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OPCJE"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OPÇÕES"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ПАРАМЕТРЫ"
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ตัวเลือก"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "SEÇENEKLER"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "TÙY CHỌN"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选项"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "選項"
+          }
+        }
+      }
+    },
     "OPTIONS AFFECTING THE SOURCE": {
       "extractionState": "manual",
       "localizations": {
@@ -26508,6 +27364,434 @@
         }
       }
     },
+    "Restore": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "استعادة"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wiederherstellen"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restaurar"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restaurer"
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "रीस्टोर करें"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pulihkan"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ripristina"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "復元"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "복원"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Przywróć"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restaurar"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Восстановить"
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "กู้คืน"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Geri Yükle"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Khôi phục"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "恢复"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "還原"
+          }
+        }
+      }
+    },
+    "Restore Complete": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "اكتملت الاستعادة"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wiederherstellung abgeschlossen"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restauración completada"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restauration terminée"
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "रीस्टोर पूरा हुआ"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pemulihan Selesai"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ripristino completato"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "復元が完了しました"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "복원 완료"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Przywracanie zakończone"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restauração concluída"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Восстановление завершено"
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "กู้คืนเสร็จสิ้น"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Geri Yükleme Tamamlandı"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Khôi phục hoàn tất"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "恢复完成"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "還原完成"
+          }
+        }
+      }
+    },
+    "Restore SQL File": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "استعادة ملف SQL"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "SQL-Datei wiederherstellen"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restaurar archivo SQL"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restaurer un fichier SQL"
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "SQL फ़ाइल रीस्टोर करें"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pulihkan File SQL"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ripristina file SQL"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "SQL ファイルを復元"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "SQL 파일 복원"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Przywróć plik SQL"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restaurar arquivo SQL"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Восстановить из SQL-файла"
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "กู้คืนไฟล์ SQL"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "SQL Dosyasını Geri Yükle"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Khôi phục tệp SQL"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "恢复 SQL 文件"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "還原 SQL 檔案"
+          }
+        }
+      }
+    },
+    "Restore...": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "استعادة..."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wiederherstellen..."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restaurar..."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restaurer..."
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "रीस्टोर..."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pulihkan..."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ripristina..."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "復元..."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "복원..."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Przywróć…"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restaurar..."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Восстановить…"
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "กู้คืน..."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Geri Yükle..."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Khôi phục..."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "恢复…"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "還原…"
+          }
+        }
+      }
+    },
     "Result %lld (%lld)": {
       "extractionState": "manual",
       "localizations": {
@@ -27150,6 +28434,113 @@
         }
       }
     },
+    "Run a SQL file · %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تشغيل ملف SQL · %@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "SQL-Datei ausführen · %@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ejecutar un archivo SQL · %@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Exécuter un fichier SQL · %@"
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "SQL फ़ाइल चलाएँ · %@"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jalankan file SQL · %@"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esegui un file SQL · %@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "SQL ファイルを実行 · %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "SQL 파일 실행 · %@"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uruchom plik SQL · %@"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Executar um arquivo SQL · %@"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Выполнить SQL-файл · %@"
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "รันไฟล์ SQL · %@"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "SQL dosyası çalıştır · %@"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chạy tệp SQL · %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "运行 SQL 文件 · %@"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "執行 SQL 檔案 · %@"
+          }
+        }
+      }
+    },
     "Runs each \";\"-separated statement in order without DELIMITER (⇧⌘↩). A CREATE PROCEDURE/FUNCTION/TRIGGER with a BEGIN…END body still needs DELIMITER.": {
       "extractionState": "manual",
       "localizations": {
@@ -27577,6 +28968,113 @@
           "stringUnit": {
             "state": "translated",
             "value": "工作表"
+          }
+        }
+      }
+    },
+    "SOURCE FILE": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "الملف المصدر"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "QUELLDATEI"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ARCHIVO DE ORIGEN"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "FICHIER SOURCE"
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "स्रोत फ़ाइल"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "FILE SUMBER"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "FILE DI ORIGINE"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "元のファイル"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "원본 파일"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PLIK ŹRÓDŁOWY"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ARQUIVO DE ORIGEM"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ИСХОДНЫЙ ФАЙЛ"
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ไฟล์ต้นทาง"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "KAYNAK DOSYA"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "TỆP NGUỒN"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "源文件"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "來源檔案"
           }
         }
       }
@@ -30367,6 +31865,327 @@
         }
       }
     },
+    "Stop at the first failed statement": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "التوقف عند أول عبارة فاشلة"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bei der ersten fehlgeschlagenen Anweisung anhalten"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Detenerse en la primera sentencia fallida"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "S'arrêter à la première instruction en échec"
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "पहले विफल स्टेटमेंट पर रुकें"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Berhenti pada pernyataan gagal pertama"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fermati alla prima istruzione non riuscita"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最初に失敗した文で止める"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "처음 실패한 문에서 중지"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zatrzymaj przy pierwszej nieudanej instrukcji"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Parar na primeira instrução com falha"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Остановиться на первом неудачном операторе"
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "หยุดที่คำสั่งแรกที่ล้มเหลว"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "İlk başarısız ifadede dur"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dừng ở câu lệnh lỗi đầu tiên"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在第一条失败的语句处停止"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在第一個失敗的陳述式處停止"
+          }
+        }
+      }
+    },
+    "Stopped at line %lld because of the error below. The statements before it were restored.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "توقفت عند السطر %lld بسبب الخطأ أدناه. تمت استعادة العبارات التي قبله."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bei Zeile %lld wegen des folgenden Fehlers angehalten. Die Anweisungen davor wurden wiederhergestellt."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Se detuvo en la línea %lld por el error de abajo. Las sentencias anteriores se restauraron."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Arrêt à la ligne %lld à cause de l'erreur ci-dessous. Les instructions précédentes ont été restaurées."
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "नीचे दी गई त्रुटि के कारण पंक्ति %lld पर रुका। उससे पहले के स्टेटमेंट रीस्टोर हो गए।"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Berhenti di baris %lld karena galat di bawah. Pernyataan sebelumnya telah dipulihkan."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Interrotto alla riga %lld a causa dell'errore qui sotto. Le istruzioni precedenti sono state ripristinate."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下のエラーのため %lld 行目で止まりました。それより前の文は復元されています。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "아래 오류로 %lld행에서 중지했습니다. 그 이전의 문은 복원되었습니다."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zatrzymano w wierszu %lld z powodu poniższego błędu. Wcześniejsze instrukcje zostały przywrócone."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Parou na linha %lld por causa do erro abaixo. As instruções anteriores foram restauradas."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Остановлено на строке %lld из-за ошибки ниже. Операторы до неё восстановлены."
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "หยุดที่บรรทัด %lld เนื่องจากข้อผิดพลาดด้านล่าง คำสั่งก่อนหน้านั้นถูกกู้คืนแล้ว"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aşağıdaki hata nedeniyle %lld. satırda duruldu. Ondan önceki ifadeler geri yüklendi."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đã dừng ở dòng %lld do lỗi bên dưới. Các câu lệnh trước đó đã được khôi phục."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "因下方错误在第 %lld 行停止。此前的语句已恢复。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "因下方錯誤在第 %lld 行停止。之前的陳述式已還原。"
+          }
+        }
+      }
+    },
+    "Stopped at line %lld. The statements before it were restored.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "توقفت عند السطر %lld. تمت استعادة العبارات التي قبله."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bei Zeile %lld angehalten. Die Anweisungen davor wurden wiederhergestellt."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Se detuvo en la línea %lld. Las sentencias anteriores se restauraron."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Arrêt à la ligne %lld. Les instructions précédentes ont été restaurées."
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "पंक्ति %lld पर रुका। उससे पहले के स्टेटमेंट रीस्टोर हो गए।"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Berhenti di baris %lld. Pernyataan sebelumnya telah dipulihkan."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Interrotto alla riga %lld. Le istruzioni precedenti sono state ripristinate."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 行目で止まりました。それより前の文は復元されています。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld행에서 중지했습니다. 그 이전의 문은 복원되었습니다."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zatrzymano w wierszu %lld. Wcześniejsze instrukcje zostały przywrócone."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Parou na linha %lld. As instruções anteriores foram restauradas."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Остановлено на строке %lld. Операторы до неё восстановлены."
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "หยุดที่บรรทัด %lld คำสั่งก่อนหน้านั้นถูกกู้คืนแล้ว"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld. satırda duruldu. Ondan önceki ifadeler geri yüklendi."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đã dừng ở dòng %lld. Các câu lệnh trước đó đã được khôi phục."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在第 %lld 行停止。此前的语句已恢复。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在第 %lld 行停止。之前的陳述式已還原。"
+          }
+        }
+      }
+    },
     "Stored Procedure Name": {
       "extractionState": "manual",
       "localizations": {
@@ -32717,6 +34536,113 @@
           "stringUnit": {
             "state": "translated",
             "value": "謝謝！"
+          }
+        }
+      }
+    },
+    "The connection to the server dropped at line %lld. The statements before it were restored.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "انقطع الاتصال بالخادم عند السطر %lld. تمت استعادة العبارات التي قبله."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Verbindung zum Server ist bei Zeile %lld abgebrochen. Die Anweisungen davor wurden wiederhergestellt."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La conexión con el servidor se cortó en la línea %lld. Las sentencias anteriores se restauraron."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La connexion au serveur a été interrompue à la ligne %lld. Les instructions précédentes ont été restaurées."
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "पंक्ति %lld पर सर्वर से कनेक्शन टूट गया। उससे पहले के स्टेटमेंट रीस्टोर हो गए।"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Koneksi ke server terputus di baris %lld. Pernyataan sebelumnya telah dipulihkan."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La connessione al server si è interrotta alla riga %lld. Le istruzioni precedenti sono state ripristinate."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 行目でサーバーとの接続が切れました。それより前の文は復元されています。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld행에서 서버 연결이 끊어졌습니다. 그 이전의 문은 복원되었습니다."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Połączenie z serwerem zostało przerwane w wierszu %lld. Wcześniejsze instrukcje zostały przywrócone."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A conexão com o servidor caiu na linha %lld. As instruções anteriores foram restauradas."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Соединение с сервером прервалось на строке %lld. Операторы до неё восстановлены."
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "การเชื่อมต่อกับเซิร์ฟเวอร์หลุดที่บรรทัด %lld คำสั่งก่อนหน้านั้นถูกกู้คืนแล้ว"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sunucu bağlantısı %lld. satırda koptu. Ondan önceki ifadeler geri yüklendi."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kết nối tới máy chủ bị ngắt ở dòng %lld. Các câu lệnh trước đó đã được khôi phục."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在第 %lld 行与服务器的连接中断。此前的语句已恢复。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在第 %lld 行與伺服器的連線中斷。之前的陳述式已還原。"
           }
         }
       }
@@ -35398,6 +37324,113 @@
           "stringUnit": {
             "state": "translated",
             "value": "復原 (⌘Z)"
+          }
+        }
+      }
+    },
+    "Use the database named in the file (its USE and CREATE DATABASE statements)": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "استخدام قاعدة البيانات المذكورة في الملف (عبارات USE وCREATE DATABASE فيه)"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die in der Datei genannte Datenbank verwenden (ihre USE- und CREATE-DATABASE-Anweisungen)"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Usar la base de datos indicada en el archivo (sus sentencias USE y CREATE DATABASE)"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Utiliser la base de données nommée dans le fichier (ses instructions USE et CREATE DATABASE)"
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "फ़ाइल में बताए गए डेटाबेस का उपयोग करें (उसके USE और CREATE DATABASE स्टेटमेंट)"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gunakan database yang disebut dalam file (pernyataan USE dan CREATE DATABASE-nya)"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Usa il database indicato nel file (le sue istruzioni USE e CREATE DATABASE)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ファイルに書かれたデータベースを使う（その USE と CREATE DATABASE 文）"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "파일에 지정된 데이터베이스 사용 (파일의 USE 및 CREATE DATABASE 문)"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Użyj bazy danych wskazanej w pliku (jego instrukcji USE i CREATE DATABASE)"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Usar o banco de dados indicado no arquivo (suas instruções USE e CREATE DATABASE)"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Использовать базу данных, указанную в файле (его операторы USE и CREATE DATABASE)"
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ใช้ฐานข้อมูลที่ระบุในไฟล์ (คำสั่ง USE และ CREATE DATABASE ของไฟล์)"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dosyada adı geçen veritabanını kullan (USE ve CREATE DATABASE ifadeleri)"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dùng cơ sở dữ liệu ghi trong tệp (các câu lệnh USE và CREATE DATABASE của tệp)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "使用文件中指定的数据库（文件中的 USE 和 CREATE DATABASE 语句）"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "使用檔案中指定的資料庫（檔案中的 USE 與 CREATE DATABASE 陳述式）"
           }
         }
       }
