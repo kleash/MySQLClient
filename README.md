@@ -188,4 +188,4 @@ into `MySQLMacClient-<version>.dmg` in the repo root.
 
 ## License
 
-Personal project — no license specified.
+Apache License 2.0 — see [LICENSE](LICENSE).
