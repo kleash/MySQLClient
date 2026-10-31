@@ -18,14 +18,17 @@ let package = Package(
         // Fork of vapor/mysql-nio 1.9.1 pinned to an exact revision, adding
         // (1) CLIENT_MULTI_RESULTS + multi-result-set draining so a `CALL` to
         // a procedure that returns a SELECT works (upstream fails it with
-        // ER_SP_BADSELECT), and (2) result sets that carry their own columns,
+        // ER_SP_BADSELECT), (2) result sets that carry their own columns,
         // so a SELECT matching zero rows still comes back with its headers
-        // instead of being indistinguishable from an INSERT/USE/DDL. See
-        // those commits' messages for the full rationale; revisit if the
-        // changes land upstream.
+        // instead of being indistinguishable from an INSERT/USE/DDL, (3) a
+        // refusal before the login when TLS was asked for and the server
+        // doesn't offer it, and (4) packets of 16 MiB or more in both
+        // directions. (3) and (4) are in stokay/mysql-nio#1; point this
+        // back at stokay/mysql-nio once it's merged. See those commits'
+        // messages for the full rationale.
         .package(
-            url: "https://github.com/stokay/mysql-nio.git",
-            revision: "568062c1ed9243743d51241f5093b7eed3498841"
+            url: "https://github.com/kleash/mysql-nio.git",
+            revision: "5cf04ac12b467cc7ff6d07feed0b5ddbffca6bab"
         )
     ],
     targets: [

@@ -17,8 +17,7 @@ final class TLSConnectionTests: XCTestCase {
         XCTAssertEqual(reloaded.tlsMode, .verifyCertificate)
     }
 
-    /// MySQLNIO quietly stays unencrypted when the server has no TLS, so
-    /// asking for it must end in either a connection that really is
+    /// Asking for encryption must end in either a connection that really is
     /// encrypted or a refusal — never a plain one.
     func testRequiredEncryptionIsOnOrTheConnectionIsRefused() async throws {
         let service = MySQLService()
@@ -45,6 +44,29 @@ final class TLSConnectionTests: XCTestCase {
         XCTAssertFalse(separateCipher?.isEmpty ?? true)
         try await separate.disconnect()
         try await service.disconnect()
+    }
+
+    /// The refusal has to come before the login: once the login is out, a
+    /// network attacker who removed TLS from the greeting has the password,
+    /// or what it takes to guess it. A wrong password tells: "access
+    /// denied" means the server got the login.
+    func testRequiredEncryptionIsRefusedBeforeTheLoginGoesOut() async throws {
+        let probe = MySQLService()
+        try await probe.connect(host: TestDatabase.host, port: TestDatabase.port, username: TestDatabase.username, password: TestDatabase.password, database: nil)
+        let hasTLS = try await probe.textQuery("SHOW GLOBAL VARIABLES LIKE 'have_ssl'").first?.column("Value")?.string
+        try await probe.disconnect()
+        try XCTSkipUnless(hasTLS == "DISABLED", "the server offers TLS")
+        for mode in [TLSMode.required, .verifyCertificate] {
+            let service = MySQLService()
+            do {
+                try await service.connect(host: TestDatabase.host, port: TestDatabase.port, username: TestDatabase.username,
+                                          password: "wrong-\(UUID().uuidString)", database: nil, tls: mode)
+                XCTFail("\(mode): connected")
+                try await service.disconnect()
+            } catch MySQLServiceError.notEncrypted {
+                // Refused before the login.
+            }
+        }
     }
 
     /// Verifying refuses a certificate this Mac doesn't trust, such as a

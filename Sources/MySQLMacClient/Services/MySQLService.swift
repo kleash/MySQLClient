@@ -117,15 +117,6 @@ actor MySQLService {
             // double-encoded text. Every reconnect comes through here too.
             do {
                 _ = try await conn.simpleQuery("SET NAMES utf8mb4").get()
-                // MySQLNIO carries on unencrypted when the server doesn't
-                // offer TLS, so asking for it isn't enough: check it's on.
-                // shortcut: the login itself has gone out by then; refusing
-                // before it needs a change in MySQLNIO.
-                if tls != nil {
-                    let cipher = try await conn.simpleQuery("SHOW SESSION STATUS LIKE 'Ssl_cipher'").get()
-                        .first?.column("Value")?.string ?? ""
-                    if cipher.isEmpty { throw MySQLServiceError.notEncrypted }
-                }
             } catch {
                 try? await conn.close().get()
                 throw error
@@ -141,6 +132,9 @@ actor MySQLService {
                 .first?.column("version")?.string
         } catch {
             try? await group.shutdownGracefully()
+            // MySQLNIO refuses before the login when TLS was asked for and
+            // the server doesn't offer it.
+            if case MySQLError.secureConnectionRequired = error { throw MySQLServiceError.notEncrypted }
             throw error
         }
     }
