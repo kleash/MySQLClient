@@ -178,7 +178,9 @@ on the app's String Catalog.
 
 `BackupRoundTripTests` backs a schema of edge cases up, drops it, restores
 the file, and checks that the server reports exactly the same tables,
-views, routines, rows and checksums as before.
+views, routines, triggers, events, rows and checksums as before.
+`testenv/run-round-trip-matrix.sh` runs those tests on MariaDB 11.4, MySQL
+8.0 and MySQL 8.4 as well.
 
 ### First Connection
 1. Launch the app → the connection form appears

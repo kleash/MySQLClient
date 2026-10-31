@@ -10,5 +10,5 @@ enum TestDatabase {
     static let host = environment["MYSQL_TEST_HOST"] ?? "127.0.0.1"
     static let port = environment["MYSQL_TEST_PORT"].flatMap(Int.init) ?? 3306
     static let username = environment["MYSQL_TEST_USER"] ?? "root"
-    static let password = environment["MYSQL_TEST_PASSWORD"]
+    static let password = environment["MYSQL_TEST_PASSWORD"].flatMap { $0.isEmpty ? nil : $0 }
 }

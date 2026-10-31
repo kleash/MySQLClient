@@ -1,6 +1,12 @@
-# The database server the tests run against: MariaDB 10.4, the version
-# XAMPP ships, with an empty root password and the fixture schema loaded.
-# Listens on 127.0.0.1 only. Start it with testenv/run-tests.sh.
+# The database servers the tests run against, listening on 127.0.0.1 only,
+# with data kept in memory. MariaDB's root has no password. MySQL's has a
+# fixed throwaway one, because MySQLNIO can't log in to MySQL 8 with an
+# empty password.
+#
+# `mariadb` (MariaDB 10.4, the version XAMPP ships) loads the fixture schema
+# and runs the whole suite: testenv/run-tests.sh. The `matrix` profile adds
+# other versions, which run the backup round-trip tests:
+# testenv/run-round-trip-matrix.sh.
 name: mysqlmacclient-test
 services:
   mariadb:
@@ -19,3 +25,42 @@ services:
       test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "--silent"]
       interval: 2s
       retries: 60
+
+  mariadb-11.4:
+    profiles: [matrix]
+    image: mariadb:11.4
+    command: --innodb-buffer-pool-size=32M --innodb-log-file-size=8M
+    environment:
+      MARIADB_ALLOW_EMPTY_ROOT_PASSWORD: "1"
+    ports: ["127.0.0.1:43307:3306"]
+    tmpfs: /var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect"]
+      interval: 2s
+      retries: 60
+
+  mysql-8.0:
+    profiles: [matrix]
+    image: mysql:8.0
+    command: --innodb-buffer-pool-size=32M
+    environment:
+      MYSQL_ROOT_PASSWORD: mysqlmacclient
+    ports: ["127.0.0.1:43308:3306"]
+    tmpfs: /var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-pmysqlmacclient", "--silent"]
+      interval: 2s
+      retries: 90
+
+  mysql-8.4:
+    profiles: [matrix]
+    image: mysql:8.4
+    command: --innodb-buffer-pool-size=32M
+    environment:
+      MYSQL_ROOT_PASSWORD: mysqlmacclient
+    ports: ["127.0.0.1:43309:3306"]
+    tmpfs: /var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-pmysqlmacclient", "--silent"]
+      interval: 2s
+      retries: 90

@@ -42,6 +42,7 @@ final class BackupRoundTripTests: XCTestCase {
 
     override func tearDown() async throws {
         try? FileManager.default.removeItem(at: dumpURL)
+        guard let service else { return }
         _ = try? await service.rawQuery("DROP DATABASE IF EXISTS `\(database)`")
         _ = try? await service.rawQuery("DROP DATABASE IF EXISTS `\(copy)`")
         try await service.disconnect()
@@ -167,7 +168,12 @@ final class BackupRoundTripTests: XCTestCase {
                 result["view \(name)"] = try await showCreate("SHOW CREATE VIEW \(quoted)")
                 continue
             }
+            // MySQL 8 shows a restored column's collation as `CHARACTER SET
+            // utf8mb4 COLLATE utf8mb4_unicode_ci` where the original said
+            // `COLLATE utf8mb4_unicode_ci`: the same thing, since a collation
+            // names its character set, so only that spelling is evened out.
             result["table \(name)"] = try await showCreate("SHOW CREATE TABLE \(quoted)")
+                .replacingOccurrences(of: #"CHARACTER SET (\w+) COLLATE (\1_\w+)"#, with: "COLLATE $2", options: .regularExpression)
             let checksum = try await service.rawQuery("CHECKSUM TABLE \(quoted)").rows.first
             result["table \(name) checksum"] = checksum?.column("Checksum")?.string
             let count = try await service.rawQuery("SELECT COUNT(*) AS n FROM \(quoted)").rows.first
@@ -259,12 +265,15 @@ final class BackupRoundTripTests: XCTestCase {
             duration TIME(6), negative TIME, zero_datetime DATETIME NULL, zero_date DATE NULL
         )
         """,
+        // MySQL refuses zero dates by default.
+        "SET SESSION sql_mode = ''",
         """
         INSERT INTO temporal VALUES
             (1, '2024-02-29 23:59:59.123456', '1000-01-01 00:00:00', '2024-03-31 01:30:00.500', '9999-12-31',
              '838:59:59.000000', '-12:30:00', '0000-00-00 00:00:00', '0000-00-00'),
             (2, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL)
         """,
+        "SET SESSION sql_mode = DEFAULT",
 
         // Strings: multi-byte text, another character set, binary with
         // trailing zero bytes, bytes that aren't UTF-8 next to bytes that
@@ -283,6 +292,10 @@ final class BackupRoundTripTests: XCTestCase {
             (2, '', '', '', X'', X'68656C6C6F', '', 'd''e', ''),
             (3, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL)
         """,
+        // JSON: a type of its own on MySQL (reported with the binary
+        // character set), text with a check on MariaDB.
+        "CREATE TABLE documents (id INT PRIMARY KEY, doc JSON)",
+        #"INSERT INTO documents VALUES (1, '{"name": "café 😀", "quote": "it''s", "path": "C:\\\\dir", "n": 1.50, "list": [1, null, true]}'), (2, NULL)"#,
         "CREATE TABLE big_blob (id INT PRIMARY KEY, payload LONGBLOB)",
         "INSERT INTO big_blob VALUES (1, REPEAT(X'00FF7F80', 786432))",
         "CREATE TABLE shapes (id INT PRIMARY KEY, shape GEOMETRY NULL)",
