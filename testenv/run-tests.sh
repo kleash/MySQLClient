@@ -9,4 +9,4 @@ cd "$(dirname "$0")/.."
 docker compose -f testenv/docker-compose.yml up -d --wait
 # The native build system: SwiftPM 6.4's default one fails on the String
 # Catalog (it makes Swift symbols of its keys, and some keys collide).
-MYSQL_TEST_HOST=127.0.0.1 MYSQL_TEST_PORT=43306 MYSQL_TEST_USER=root swift test --build-system native "$@"
+MYSQL_TEST_HOST=127.0.0.1 MYSQL_TEST_PORT=43306 MYSQL_TEST_USER=root MYSQL_TEST_PASSWORD= swift test --build-system native "$@"
