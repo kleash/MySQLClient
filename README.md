@@ -125,8 +125,9 @@ Sources/MySQLMacClient/
 git clone https://github.com/stokay/MySQLClient.git
 cd MySQLClient
 
-# Build and run
-swift run
+# Build and run (`--build-system native`: SwiftPM 6.4's default build
+# system fails on the app's String Catalog)
+swift run --build-system native
 
 # — or open in Xcode for full IDE experience —
 open Package.swift
