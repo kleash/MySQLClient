@@ -302,6 +302,36 @@ final class DatabaseRestoreViewModelTests: XCTestCase {
         XCTAssertEqual(length, 2)
     }
 
+    /// A file of several databases (`mysqldump --databases a b`) can't go
+    /// into one: each database's DROP TABLE would replace the same-named
+    /// table restored from the one before. The restore stops where the
+    /// second database starts, before running any of it, even when told to
+    /// carry on past failed statements.
+    func testStopsWhereTheFileMovesOnToAnotherDatabase() async throws {
+        let second = "\(other)_b"
+        addTeardownBlock { [service] in _ = try? await service?.rawQuery("DROP DATABASE IF EXISTS `\(second)`") }
+        let viewModel = try await restore(Data("""
+            CREATE DATABASE /*!32312 IF NOT EXISTS*/ `\(other)` /*!40100 DEFAULT CHARACTER SET latin1 COLLATE latin1_general_ci */;
+            USE `\(other)`;
+            DROP TABLE IF EXISTS `t`;
+            CREATE TABLE `t` (id INT PRIMARY KEY);
+            INSERT INTO `t` VALUES (1),(2);
+            CREATE DATABASE /*!32312 IF NOT EXISTS*/ `\(second)` /*!40100 DEFAULT CHARACTER SET utf8mb4 */;
+            USE `\(second)`;
+            DROP TABLE IF EXISTS `t`;
+            CREATE TABLE `t` (id INT PRIMARY KEY);
+            INSERT INTO `t` VALUES (3);
+            """.utf8)) { $0.stopOnFirstError = false }
+
+        XCTAssertEqual(viewModel.failure, .moreThanOneDatabase(line: 6))
+        let restored = try await ids(in: "t")
+        XCTAssertEqual(restored, [1, 2])
+        let collation = try await service.query("""
+            SELECT DEFAULT_COLLATION_NAME AS c FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = '\(database)'
+            """).first?.column("c")?.string
+        XCTAssertEqual(collation, "latin1_general_ci")
+    }
+
     func testTurnsTheFilesDatabaseStatementsToTheChosenDatabase() {
         // They pick or replace a database: skipped.
         for statement in ["USE `x`", "use x", "CREATE DATABASE x", "create schema if not exists x", "CREATE OR REPLACE DATABASE x",
@@ -318,6 +348,12 @@ final class DatabaseRestoreViewModelTests: XCTestCase {
         ] {
             XCTAssertEqual(DatabaseRestoreViewModel.intoChosenDatabase(statement), rewritten, statement)
         }
+        // One database, however its name is quoted.
+        XCTAssertEqual(["USE `shop`", "use shop", "CREATE DATABASE /*!32312 IF NOT EXISTS*/ `shop` /*!40100 DEFAULT CHARACTER SET latin1 */",
+                        "ALTER DATABASE \"shop\" COLLATE latin1_bin", "/*!40000 DROP DATABASE IF EXISTS `shop`*/"].map(DatabaseRestoreViewModel.databaseName),
+                       ["shop", "shop", "shop", "shop", "shop"])
+        XCTAssertEqual(DatabaseRestoreViewModel.databaseName(in: "USE `a``b`"), "a`b")
+        XCTAssertNil(DatabaseRestoreViewModel.databaseName(in: "ALTER DATABASE COLLATE latin1_bin"))
         // Anything else, a nameless ALTER DATABASE included: as it is.
         for statement in ["USER_LOCK()", "UPDATE t SET a = 1", "CREATE TABLE databases (id INT)", "SELECT 'USE x'", "/*!40101 SET NAMES utf8mb4 */",
                           "ALTER TABLE databases ADD c INT", "ALTER DATABASE COLLATE utf8mb4_unicode_ci", "ALTER DATABASE /*!40100 DEFAULT CHARACTER SET latin1 */"] {

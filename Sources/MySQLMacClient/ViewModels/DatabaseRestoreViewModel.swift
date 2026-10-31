@@ -43,9 +43,12 @@ final class DatabaseRestoreViewModel: ObservableObject {
         case stoppedAtError(line: Int)
         case connectionLost(line: Int)
         case cancelled(line: Int)
+        case moreThanOneDatabase(line: Int)
 
         var errorDescription: String? {
             switch self {
+            case .moreThanOneDatabase(let line):
+                return String(localized: "Stopped at line \(line), where the file moves on to another database: restored into one, their tables would overwrite each other. To restore each into its own database, turn on \"Use the database named in the file\". The statements before it were restored.")
             case .notUTF8(let line):
                 return String(localized: "Line \(line) isn't UTF-8 text, so it can't be sent to the server unchanged. A mysqldump file made without --hex-blob can hold raw binary data like this: restore it with the mysql client, or make the dump with --hex-blob.")
             case .stoppedAtError(let line):
@@ -135,6 +138,13 @@ final class DatabaseRestoreViewModel: ObservableObject {
         return (match.opener ?? "") + "ALTER DATABASE " + match.settings
     }
 
+    /// The database a USE, CREATE, DROP or ALTER DATABASE names, unquoted.
+    static func databaseName(in statement: String) -> String? {
+        guard let name = statement.prefixMatch(of: databaseStatement)?.name else { return nil }
+        guard let quote = name.first, quote == "`" || quote == "\"" else { return String(name) }
+        return name.dropFirst().dropLast().replacingOccurrences(of: "\(quote)\(quote)", with: "\(quote)")
+    }
+
     private static let databaseStatement = #/
         (?i) (?<opener> /\*!\d* \s* )?
         (?: USE \b
@@ -165,6 +175,7 @@ final class DatabaseRestoreViewModel: ObservableObject {
             var reachedEnd = false
             var readSize = readChunkSize
             var statements: [(sql: [UInt8], line: Int)] = []
+            var filesDatabase: String?
             repeat {
                 // The splitter stops after a statement that mentions
                 // sql_mode: what it holds after that is split the way the
@@ -192,6 +203,11 @@ final class DatabaseRestoreViewModel: ObservableObject {
                         throw RestoreError.notUTF8(line: line)
                     }
                     let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !useDatabaseNamedInFile, let name = Self.databaseName(in: trimmed) {
+                        // A second database would land on the first one's tables.
+                        if let filesDatabase, name != filesDatabase { throw RestoreError.moreThanOneDatabase(line: line) }
+                        filesDatabase = name
+                    }
                     guard let sql = useDatabaseNamedInFile ? trimmed : Self.intoChosenDatabase(trimmed), !sql.isEmpty else { continue }
                     do {
                         _ = try await connection.textQuery(sql)
