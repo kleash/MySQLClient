@@ -12,3 +12,4 @@ server/analytics/config.php
 CODE_REVIEW.md
 CODE_REVIEW_TR.md
 Sources/MySQLMacClient/Resources/settings-old.png
+testenv/.keys/

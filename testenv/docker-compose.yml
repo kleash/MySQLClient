@@ -6,7 +6,9 @@
 # `mariadb` (MariaDB 10.4, the version XAMPP ships) loads the fixture schema
 # and runs the whole suite: testenv/run-tests.sh. The `matrix` profile adds
 # other versions, which run the backup round-trip tests:
-# testenv/run-round-trip-matrix.sh.
+# testenv/run-round-trip-matrix.sh. The `ssh` profile is a database that
+# can only be reached through an SSH server, itself reached directly or
+# through an HTTP proxy with a login; testenv/run-tests.sh starts it.
 name: mysqlmacclient-test
 services:
   mariadb:
@@ -64,3 +66,35 @@ services:
       test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-pmysqlmacclient", "--silent"]
       interval: 2s
       retries: 90
+
+  # Reachable only from the `ssh` server, on the internal network.
+  private-mariadb:
+    profiles: [ssh]
+    image: mariadb:10.4
+    command: --innodb-buffer-pool-size=32M --innodb-log-file-size=8M
+    environment:
+      MARIADB_ALLOW_EMPTY_ROOT_PASSWORD: "1"
+    networks: [private]
+    tmpfs: /var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "--silent"]
+      interval: 2s
+      retries: 60
+
+  ssh:
+    profiles: [ssh]
+    build:
+      context: .keys
+      dockerfile: ../ssh/sshd.Dockerfile
+    ports: ["127.0.0.1:43322:22"]
+    networks: [default, private]
+
+  proxy:
+    profiles: [ssh]
+    build:
+      dockerfile: ssh/proxy.Dockerfile
+    ports: ["127.0.0.1:43380:8888"]
+
+networks:
+  private:
+    internal: true

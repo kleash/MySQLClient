@@ -1,0 +1,138 @@
+import XCTest
+@testable import MySQLMacClient
+
+/// Runs against the `ssh` profile of testenv/docker-compose.yml (started by
+/// testenv/run-tests.sh): a MariaDB on an internal network that only the
+/// SSH server can reach, the SSH server on 127.0.0.1:43322, and an HTTP
+/// proxy that wants a login on 127.0.0.1:43380. Each test gives ssh a fresh
+/// folder of its own, so nothing is written to ~/.ssh.
+final class SSHTunnelTests: XCTestCase {
+    private var environment: [String: String] { ProcessInfo.processInfo.environment }
+    private var sshFolder: URL!
+    private var tunnel: SSHTunnel?
+    private var service: MySQLService?
+
+    override func setUp() async throws {
+        guard environment["MYSQL_TEST_SSH_PORT"] != nil else {
+            throw XCTSkip("The SSH test servers aren't running (testenv/run-tests.sh starts them).")
+        }
+        sshFolder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: sshFolder, withIntermediateDirectories: true)
+    }
+
+    override func tearDown() async throws {
+        try? await service?.disconnect()
+        tunnel?.close()
+        if let sshFolder { try? FileManager.default.removeItem(at: sshFolder) }
+    }
+
+    private var direct: SSHSettings {
+        SSHSettings(host: "127.0.0.1", port: Int(environment["MYSQL_TEST_SSH_PORT"]!)!, username: "tunnel",
+                    keyFile: environment["MYSQL_TEST_SSH_KEY"]!)
+    }
+
+    /// The SSH server by the name the proxy knows it by.
+    private var behindProxy: SSHSettings {
+        SSHSettings(host: "ssh", port: 22, username: "tunnel", keyFile: environment["MYSQL_TEST_SSH_KEY"]!,
+                    proxy: HTTPProxySettings(host: "127.0.0.1", port: Int(environment["MYSQL_TEST_PROXY_PORT"]!)!, username: "proxyuser"))
+    }
+
+    /// Opens a tunnel to the private database and connects through it.
+    private func connect(_ settings: SSHSettings, proxyPassword: String = "proxy-test-password") async throws -> MySQLService {
+        let proxy = settings.proxy.map {
+            HTTPProxyConnector.Proxy(host: $0.host, port: $0.port, username: $0.username, password: proxyPassword)
+        }
+        let tunnel = SSHTunnel(settings: settings, proxy: proxy, sshFolder: sshFolder)
+        self.tunnel = tunnel
+        let localPort = try await tunnel.open(to: "private-mariadb", port: 3306)
+        let service = MySQLService()
+        self.service = service
+        try await service.connect(host: "127.0.0.1", port: localPort, username: "root", password: nil, database: nil)
+        return service
+    }
+
+    private func assertReachesThePrivateDatabase(_ service: MySQLService) async throws {
+        let rows = try await service.textQuery("SELECT @@hostname AS host, 1 + 1 AS two")
+        XCTAssertEqual(rows.first?.column("two")?.string, "2")
+    }
+
+    func testReachesADatabaseOnlyTheSSHServerCanReach() async throws {
+        let service = try await connect(direct)
+        try await assertReachesThePrivateDatabase(service)
+        let knownHosts = try String(contentsOf: sshFolder.appendingPathComponent("known_hosts"), encoding: .utf8)
+        XCTAssertTrue(knownHosts.contains("[127.0.0.1]:\(direct.port)"), "a first-seen host key is kept")
+    }
+
+    func testReachesItThroughAnHTTPProxyThatWantsALogin() async throws {
+        let service = try await connect(behindProxy)
+        try await assertReachesThePrivateDatabase(service)
+    }
+
+    func testSaysWhenTheProxyRefusesTheLogin() async throws {
+        do {
+            _ = try await connect(behindProxy, proxyPassword: "wrong")
+            XCTFail("connected with a wrong proxy password")
+        } catch let failure as SSHTunnel.Failure {
+            // tinyproxy answers a wrong login with 401, others with 407 again.
+            XCTAssertTrue(failure.message.contains("The proxy refused the connection to ssh:22"), failure.message)
+        }
+    }
+
+    func testSaysWhenTheServerRefusesTheKey() async throws {
+        let otherKey = sshFolder.appendingPathComponent("other_key")
+        let keygen = try Process.run(URL(fileURLWithPath: "/usr/bin/ssh-keygen"), arguments: ["-q", "-t", "ed25519", "-N", "", "-f", otherKey.path])
+        keygen.waitUntilExit()
+        var settings = direct
+        settings.keyFile = otherKey.path
+        do {
+            _ = try await connect(settings)
+            XCTFail("connected with a key the server doesn't accept")
+        } catch let failure as SSHTunnel.Failure {
+            XCTAssertTrue(failure.message.contains("Permission denied"), failure.message)
+        }
+    }
+
+    /// A host key that differs from the one remembered is someone else
+    /// answering: ssh must refuse, not replace it.
+    func testRefusesAServerWhoseHostKeyHasChanged() async throws {
+        try "[127.0.0.1]:\(direct.port) ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl\n"
+            .write(to: sshFolder.appendingPathComponent("known_hosts"), atomically: true, encoding: .utf8)
+        do {
+            _ = try await connect(direct)
+            XCTFail("connected to a server whose host key changed")
+        } catch let failure as SSHTunnel.Failure {
+            XCTAssertTrue(failure.message.contains("Host key verification failed"), failure.message)
+        }
+    }
+
+    /// ssh dies (the network dropped): the tunnel starts it again on the
+    /// same port, and the next query reconnects through it.
+    func testComesBackAfterSSHEnds() async throws {
+        let service = try await connect(direct)
+        let killed = try Process.run(URL(fileURLWithPath: "/usr/bin/pkill"), arguments: ["-f", "--", "-p \(direct.port) .*-- 127.0.0.1"])
+        killed.waitUntilExit()
+        try await Task.sleep(for: .seconds(3))
+        try await assertReachesThePrivateDatabase(service)
+    }
+
+    // MARK: - Pure
+
+    func testArgumentsKeepTheHostFromBeingReadAsAnOption() {
+        let arguments = SSHTunnel.arguments(
+            settings: SSHSettings(host: "-oProxyCommand=touch /tmp/pwned", port: 22, username: "u", keyFile: "/keys/100%.pem"),
+            localPort: 40000, databaseHost: "::1", databasePort: 3306, relayPort: nil, sshFolder: nil
+        )
+        XCTAssertEqual(arguments.suffix(2), ["--", "-oProxyCommand=touch /tmp/pwned"])
+        XCTAssertTrue(arguments.contains("127.0.0.1:40000:[::1]:3306"))
+        XCTAssertTrue(arguments.contains("/keys/100%%.pem"))
+    }
+
+    /// RFC 2617's own example: user Mufasa, GET /dir/index.html.
+    func testDigestAnswerMatchesTheRFCExample() {
+        let challenge = ["realm": "testrealm@host.com", "qop": "auth,auth-int", "nonce": "dcd98b7102dd2f0e8b11d0f600bfb0c093",
+                         "opaque": "5ccc069c403ebaf9f0171e9517f40e41"]
+        let header = HTTPProxyConnector.digest(challenge, username: "Mufasa", password: "Circle Of Life", uri: "/dir/index.html",
+                                               cnonce: "0a4f113b", method: "GET")
+        XCTAssertTrue(header?.contains(#"response="6629fae49393a05397450978507c4ef1""#) ?? false, header ?? "nil")
+    }
+}

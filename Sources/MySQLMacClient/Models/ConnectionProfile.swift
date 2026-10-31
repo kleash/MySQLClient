@@ -13,6 +13,9 @@ struct ConnectionProfile: Identifiable, Codable, Equatable, Hashable {
     /// `nil`: not encrypted. Optional so connections saved before this
     /// existed still load.
     var tlsMode: TLSMode?
+    /// Set when the database is reached through an SSH server; `host` and
+    /// `port` are then the database as that server sees it.
+    var ssh: SSHSettings?
 
     init(
         id: UUID = UUID(),
@@ -22,7 +25,8 @@ struct ConnectionProfile: Identifiable, Codable, Equatable, Hashable {
         username: String,
         database: String?,
         note: String? = nil,
-        tlsMode: TLSMode? = nil
+        tlsMode: TLSMode? = nil,
+        ssh: SSHSettings? = nil
     ) {
         self.id = id
         self.name = name
@@ -32,7 +36,27 @@ struct ConnectionProfile: Identifiable, Codable, Equatable, Hashable {
         self.database = database
         self.note = note
         self.tlsMode = tlsMode
+        self.ssh = ssh
     }
+}
+
+/// The SSH server a connection goes through (`SSHTunnel`). Its proxy's
+/// password is kept in the Keychain, like the database password.
+struct SSHSettings: Codable, Equatable, Hashable {
+    var host: String
+    var port: Int = 22
+    var username: String
+    /// Empty: the keys ssh finds by itself (ssh-agent, the SSH folder).
+    var keyFile: String = ""
+    var proxy: HTTPProxySettings?
+}
+
+/// An HTTP proxy in front of the SSH server.
+struct HTTPProxySettings: Codable, Equatable, Hashable {
+    var host: String
+    var port: Int
+    /// Empty: the proxy wants no login.
+    var username: String = ""
 }
 
 /// How the connection to the server is encrypted.

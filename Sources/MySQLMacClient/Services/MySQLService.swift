@@ -43,6 +43,7 @@ enum MySQLServiceError: Error, LocalizedError {
     case notConnected
     case invalidIdentifier(String)
     case notEncrypted
+    case loginTimedOut
 
     var errorDescription: String? {
         switch self {
@@ -52,6 +53,8 @@ enum MySQLServiceError: Error, LocalizedError {
             return String(localized: "Invalid table/column name: \(identifier)")
         case .notEncrypted:
             return String(localized: "The server doesn't offer an encrypted (TLS) connection, so the connection was closed. Turn encryption off for this connection, or enable TLS on the server.")
+        case .loginTimedOut:
+            return String(localized: "The server didn't complete the login within \(Int(MySQLService.loginTimeout.nanoseconds / 1_000_000_000)) seconds. The connection may have been closed before the server answered.")
         }
     }
 }
@@ -60,6 +63,9 @@ enum MySQLServiceError: Error, LocalizedError {
 /// No pooling in the MVP: one connection per app session, created on
 /// `connect` and torn down on `disconnect`.
 actor MySQLService {
+    /// How long a server gets to complete the login once connected.
+    static let loginTimeout: TimeAmount = .seconds(15)
+
     private var eventLoopGroup: MultiThreadedEventLoopGroup?
     private var connection: MySQLConnection?
 
@@ -100,7 +106,14 @@ actor MySQLService {
         let address = try SocketAddress.makeAddressResolvingHost(host, port: port)
 
         do {
-            let conn = try await MySQLConnection.connect(
+            // MySQLNIO's login waits forever if the connection closes before
+            // the server's greeting (an SSH forward the server refused, a
+            // server going down), so it gets a time limit of its own.
+            let login = eventLoop.makePromise(of: MySQLConnection.self)
+            let timeout = eventLoop.scheduleTask(in: Self.loginTimeout) {
+                login.fail(MySQLServiceError.loginTimedOut)
+            }
+            MySQLConnection.connect(
                 to: address,
                 username: username,
                 database: database ?? "",
@@ -110,7 +123,8 @@ actor MySQLService {
                 // is checked against the certificate's addresses instead.
                 serverHostname: tls != nil && (try? SocketAddress(ipAddress: host, port: 0)) == nil ? host : nil,
                 on: eventLoop
-            ).get()
+            ).cascade(to: login)
+            let conn = try await login.futureResult.always { _ in timeout.cancel() }.get()
             // MySQLNIO's login asks for collation 255, which only MySQL 8
             // knows; MariaDB silently falls back to its default (often
             // latin1) and would then store the UTF-8 this app sends as

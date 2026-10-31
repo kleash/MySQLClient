@@ -38,6 +38,7 @@ final class MySQLServiceReconnectTests: XCTestCase {
         guard let connectionID = idRows.first?.column("id")?.int else {
             return XCTFail("could not read CONNECTION_ID()")
         }
+        let countBefore = try await service.query("SELECT COUNT(*) AS cnt FROM widgets").first?.column("cnt")?.int
 
         // A second, independent admin connection kills the first one from
         // the server side — this is what an idle-timing-out NAT/firewall
@@ -54,9 +55,38 @@ final class MySQLServiceReconnectTests: XCTestCase {
         // Without auto-reconnect this throws MySQLError.closed. With it,
         // this call transparently reconnects and this succeeds.
         let rows = try await service.query("SELECT COUNT(*) AS cnt FROM widgets")
-        XCTAssertEqual(rows.first?.column("cnt")?.int, 3)
+        XCTAssertEqual(rows.first?.column("cnt")?.int, countBefore)
 
         let isConnected = await service.isConnected
         XCTAssertTrue(isConnected)
+    }
+
+    /// A connection closed before the server's greeting (as an SSH server
+    /// does with a forward it refuses) ends the login with an error
+    /// instead of leaving it waiting forever.
+    func testLoginEndsWhenTheConnectionClosesBeforeTheServerAnswers() async throws {
+        let listener = socket(AF_INET, SOCK_STREAM, 0)
+        var address = sockaddr_in()
+        address.sin_family = sa_family_t(AF_INET)
+        address.sin_addr.s_addr = inet_addr("127.0.0.1")
+        var length = socklen_t(MemoryLayout<sockaddr_in>.size)
+        let listening = withUnsafeMutablePointer(to: &address) {
+            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                Darwin.bind(listener, $0, length) == 0 && listen(listener, 1) == 0 && getsockname(listener, $0, &length) == 0
+            }
+        }
+        XCTAssertTrue(listening)
+        defer { close(listener) }
+        Thread.detachNewThread { close(accept(listener, nil, nil)) }
+
+        let refused = MySQLService()
+        let started = Date()
+        do {
+            try await refused.connect(host: "127.0.0.1", port: Int(UInt16(bigEndian: address.sin_port)),
+                                      username: "root", password: nil, database: nil)
+            XCTFail("logged in to a connection that closed")
+        } catch {
+            XCTAssertLessThan(Date().timeIntervalSince(started), 20)
+        }
     }
 }
