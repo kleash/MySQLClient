@@ -26,7 +26,7 @@ final class BackupRoundTripTests: XCTestCase {
         dumpURL = FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID().uuidString).sql")
         service = try await connect()
         _ = try await service.rawQuery("DROP DATABASE IF EXISTS `\(database)`")
-        _ = try await service.rawQuery("CREATE DATABASE `\(database)`")
+        _ = try await service.rawQuery("CREATE DATABASE `\(database)` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci")
         _ = try await service.rawQuery("USE `\(database)`")
         for statement in Self.corpus {
             do {
@@ -123,6 +123,7 @@ final class BackupRoundTripTests: XCTestCase {
         // the current one, and dropping a database leaves none current.
         _ = try await service.rawQuery("USE `\(database)`")
         var result: [String: String] = [:]
+        result["database"] = try await showCreate("SHOW CREATE DATABASE `\(database)`")
         let objects = try await service.rawQuery("""
             SELECT TABLE_NAME AS name, TABLE_TYPE AS type FROM information_schema.TABLES
             WHERE TABLE_SCHEMA = '\(database)'

@@ -463,7 +463,10 @@ final class DatabaseBackupViewModel: ObservableObject {
 
             """
         if options.file.includeCreateDatabaseStatement {
-            header += "CREATE DATABASE IF NOT EXISTS \(SQLExporter.quoted(database.name));\n"
+            // The server's own statement, so the database comes back with its
+            // default character set and collation, not the target server's.
+            let createDatabase = try await introspection.showCreateDatabase(database.name)
+            header += createDatabase.replacingOccurrences(of: "CREATE DATABASE ", with: "CREATE DATABASE IF NOT EXISTS ", options: .anchored) + ";\n"
         }
         if options.file.includeUseStatement {
             header += "USE \(SQLExporter.quoted(database.name));\n"

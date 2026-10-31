@@ -133,6 +133,17 @@ struct SchemaIntrospectionService {
         return raw.replacingOccurrences(of: qualifiedPrefix, with: "")
     }
 
+    /// `SHOW CREATE DATABASE`: the database with its default character set
+    /// and collation, which every table, routine and column created in it
+    /// later inherits.
+    func showCreateDatabase(_ database: String) async throws -> String {
+        let rows = try await service.query("SHOW CREATE DATABASE \(try Self.quotedIdentifier(database))")
+        guard let raw = rows.first?.column("Create Database")?.string else {
+            throw MySQLServiceError.invalidIdentifier(database)
+        }
+        return raw
+    }
+
     /// `SHOW <kind> STATUS` is server-wide by default; scoped here with a
     /// `WHERE Db = '...'` literal (same pattern as `collations(forCharset:)`
     /// — `SHOW` statements' patchy prepared-statement support is why this is
