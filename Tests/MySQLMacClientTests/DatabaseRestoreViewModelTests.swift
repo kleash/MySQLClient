@@ -92,6 +92,25 @@ final class DatabaseRestoreViewModelTests: XCTestCase {
         XCTAssertEqual(restored, [])
     }
 
+    /// MySQLNIO sends a statement as one packet, whose length is 3 bytes,
+    /// so the server got one of 16 MiB or more cut to that length modulo
+    /// 16 MiB. This one, 2^24 + 15 bytes long, reached it as `DELETE FROM
+    /// big` and emptied the table. It has to be refused, unsent.
+    func testRefusesAStatementTooBigToSendInsteadOfCuttingItShort() async throws {
+        let delete = "DELETE FROM big WHERE id = 1 /* "
+        let filler = String(repeating: "x", count: (1 << 24) + 15 - delete.utf8.count - " */".utf8.count)
+        let viewModel = try await restore(Data("""
+            CREATE TABLE big (id INT PRIMARY KEY);
+            INSERT INTO big VALUES (1), (2), (3);
+            \(delete)\(filler) */;
+            INSERT INTO big VALUES (4);
+            """.utf8)) { $0.readChunkSize = 1 << 25 }
+
+        XCTAssertEqual(viewModel.failure, .statementTooLarge(line: 3))
+        let restored = try await ids(in: "big")
+        XCTAssertEqual(restored, [1, 2, 3])
+    }
+
     /// Routines made under NO_BACKSLASH_ESCAPES, as mysqldump, HeidiSQL and
     /// this app's backup write them: after the file's SET sql_mode, `'C:\'`
     /// is a whole string, as the mysql client reads it from the server's

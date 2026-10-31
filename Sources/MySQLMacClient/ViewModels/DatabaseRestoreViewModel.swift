@@ -44,9 +44,12 @@ final class DatabaseRestoreViewModel: ObservableObject {
         case connectionLost(line: Int)
         case cancelled(line: Int)
         case moreThanOneDatabase(line: Int)
+        case statementTooLarge(line: Int)
 
         var errorDescription: String? {
             switch self {
+            case .statementTooLarge(let line):
+                return String(localized: "Stopped at line \(line): the statement there is 16 MB or larger, more than this restore can send to the server. The statements before it were restored; to restore the whole file, use the mysql client.")
             case .moreThanOneDatabase(let line):
                 return String(localized: "Stopped at line \(line), where the file moves on to another database: restored into one, their tables would overwrite each other. To restore each into its own database, turn on \"Use the database named in the file\". The statements before it were restored.")
             case .notUTF8(let line):
@@ -209,6 +212,11 @@ final class DatabaseRestoreViewModel: ObservableObject {
                         filesDatabase = name
                     }
                     guard let sql = useDatabaseNamedInFile ? trimmed : Self.intoChosenDatabase(trimmed), !sql.isEmpty else { continue }
+                    // shortcut: MySQLNIO sends a query as one packet, whose
+                    // length has 3 bytes, so a statement of 16 MiB or more
+                    // would reach the server cut short; refused until it
+                    // splits packets as the mysql client does.
+                    guard sql.utf8.count < 0xFF_FF_FE else { throw RestoreError.statementTooLarge(line: line) }
                     do {
                         _ = try await connection.textQuery(sql)
                         current.statementsRun += 1
