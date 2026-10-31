@@ -627,6 +627,12 @@ final class DatabaseBackupViewModel: ObservableObject {
     /// computes them and refuses an INSERT that names them.
     private func dumpTableData(_ table: TableInfo, to fileHandle: FileHandle) async throws {
         let allColumns = try await introspection.columns(forTable: table.name, inDatabase: database.name)
+        // shortcut: a MariaDB system-versioned table gives only its current
+        // rows, and its row start and end columns are generated, so history
+        // and row start times aren't kept (10.4 can't insert them back:
+        // ERROR 1906; mysqldump leaves them out too); read them FOR
+        // SYSTEM_TIME ALL and restore with system_versioning_insert_history
+        // (10.11+) if they're needed.
         let columns = allColumns.filter { !$0.isGenerated }
         let qualifiedTable = try SchemaIntrospectionService.qualifiedIdentifier(database: database.name, name: table.name)
         // FLOAT is read as DOUBLE: the server prints a FLOAT with only six
@@ -638,6 +644,12 @@ final class DatabaseBackupViewModel: ObservableObject {
         // that member is '', the same as an ENUM's error value or a SET's
         // empty set. (A type that only looks as if it declares '' is read
         // as numbers too, which restore just as well.)
+        //
+        // shortcut: text in a character set other than UTF-8 is read
+        // converted to utf8mb4, so a byte with no Unicode character (0x98 in
+        // cp1251; latin1 has none) comes back as '?'; select such columns as
+        // CAST(col AS BINARY) and write them as _charset X'..' if that data
+        // turns up.
         let selectExpressions = columns.map { column in
             let type = column.mysqlType.lowercased()
             if type.hasPrefix("float") {
