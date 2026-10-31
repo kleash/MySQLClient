@@ -273,15 +273,55 @@ final class DatabaseRestoreViewModelTests: XCTestCase {
         XCTAssertTrue(inTarget.isEmpty)
     }
 
-    func testRecognisesTheStatementsThatChooseADatabase() {
-        for statement in ["USE `x`", "use x", "CREATE DATABASE x", "create schema if not exists x",
-                          "DROP DATABASE IF EXISTS x", "/*!40000 DROP DATABASE IF EXISTS `x`*/", "CREATE DATABASE /*!32312 IF NOT EXISTS*/ `x`",
-                          "ALTER DATABASE `x` CHARACTER SET latin1 COLLATE latin1_swedish_ci ;"] {
-            XCTAssertTrue(DatabaseRestoreViewModel.choosesDatabase(statement), statement)
+    /// The file's database settings go to the chosen database instead: its
+    /// own character set and collation, and those mysqldump sets around a
+    /// routine made under another one. The copy's routines keep the
+    /// collation they were made with (a parameter without a character set
+    /// takes the database's), and the original is left alone.
+    func testGivesTheChosenDatabaseTheFilesDatabaseSettings() async throws {
+        _ = try await service.rawQuery("CREATE DATABASE `\(other)` CHARACTER SET latin1 COLLATE latin1_general_ci")
+        let viewModel = try await restore(Data("""
+            CREATE DATABASE /*!32312 IF NOT EXISTS*/ `\(other)` /*!40100 DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci */;
+            USE `\(other)`;
+            CREATE FUNCTION f_len(x VARCHAR(10)) RETURNS INT DETERMINISTIC RETURN CHAR_LENGTH(x);
+            ALTER DATABASE `\(other)` CHARACTER SET latin1 COLLATE latin1_swedish_ci ;
+            CREATE PROCEDURE p_latin() SELECT 1;
+            ALTER DATABASE `\(other)` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci ;
+            """.utf8))
+
+        XCTAssertNil(viewModel.errorMessage)
+        let databases = try await service.query("""
+            SELECT CONCAT(SCHEMA_NAME, ' ', DEFAULT_COLLATION_NAME) AS c FROM information_schema.SCHEMATA WHERE SCHEMA_NAME IN ('\(database)', '\(other)') ORDER BY 1
+            """).compactMap { $0.column("c")?.string }
+        XCTAssertEqual(databases, ["\(database) utf8mb4_unicode_ci", "\(other) latin1_general_ci"])
+        let routines = try await service.query("""
+            SELECT CONCAT(ROUTINE_NAME, ' ', DATABASE_COLLATION) AS c FROM information_schema.ROUTINES WHERE ROUTINE_SCHEMA = '\(database)' ORDER BY 1
+            """).compactMap { $0.column("c")?.string }
+        XCTAssertEqual(routines, ["f_len utf8mb4_unicode_ci", "p_latin latin1_swedish_ci"])
+        let length = try? await service.query("SELECT `\(database)`.f_len('😀ü') AS n").first?.column("n")?.int
+        XCTAssertEqual(length, 2)
+    }
+
+    func testTurnsTheFilesDatabaseStatementsToTheChosenDatabase() {
+        // They pick or replace a database: skipped.
+        for statement in ["USE `x`", "use x", "CREATE DATABASE x", "create schema if not exists x", "CREATE OR REPLACE DATABASE x",
+                          "DROP DATABASE IF EXISTS x", "/*!40000 DROP DATABASE IF EXISTS `x`*/", "CREATE DATABASE /*!32312 IF NOT EXISTS*/ `x`"] {
+            XCTAssertNil(DatabaseRestoreViewModel.intoChosenDatabase(statement), statement)
         }
+        // Their settings: given to the current database, the chosen one.
+        for (statement, rewritten) in [
+            ("CREATE DATABASE /*!32312 IF NOT EXISTS*/ `x` /*!40100 DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci */ /*!80016 DEFAULT ENCRYPTION='N' */",
+             "ALTER DATABASE /*!40100 DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci */ /*!80016 DEFAULT ENCRYPTION='N' */"),
+            ("CREATE OR REPLACE SCHEMA IF NOT EXISTS `a``b` CHARSET latin1", "ALTER DATABASE CHARSET latin1"),
+            ("ALTER DATABASE `x` CHARACTER SET latin1 COLLATE latin1_swedish_ci", "ALTER DATABASE CHARACTER SET latin1 COLLATE latin1_swedish_ci"),
+            ("alter schema x\ncollate utf8mb4_bin", "ALTER DATABASE collate utf8mb4_bin"),
+        ] {
+            XCTAssertEqual(DatabaseRestoreViewModel.intoChosenDatabase(statement), rewritten, statement)
+        }
+        // Anything else, a nameless ALTER DATABASE included: as it is.
         for statement in ["USER_LOCK()", "UPDATE t SET a = 1", "CREATE TABLE databases (id INT)", "SELECT 'USE x'", "/*!40101 SET NAMES utf8mb4 */",
-                          "ALTER TABLE databases ADD c INT"] {
-            XCTAssertFalse(DatabaseRestoreViewModel.choosesDatabase(statement), statement)
+                          "ALTER TABLE databases ADD c INT", "ALTER DATABASE COLLATE utf8mb4_unicode_ci", "ALTER DATABASE /*!40100 DEFAULT CHARACTER SET latin1 */"] {
+            XCTAssertEqual(DatabaseRestoreViewModel.intoChosenDatabase(statement), statement)
         }
     }
 

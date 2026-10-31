@@ -93,13 +93,15 @@ final class BackupRoundTripTests: XCTestCase {
     }
 
     /// The app's own restore (`DatabaseRestoreViewModel`) of a default
-    /// backup, into another database: it has to skip the file's USE and
-    /// CREATE DATABASE, and come out the same reading the file in chunks
-    /// small enough to cut every statement, string and character.
+    /// backup, into another database made with the server's defaults: it
+    /// has to skip the file's USE and CREATE DATABASE but give the copy
+    /// the original's character set and collation, and come out the same
+    /// reading the file in chunks small enough to cut every statement,
+    /// string and character.
     func testBackupRestoredWithTheAppIntoAnotherDatabaseMatchesTheOriginal() async throws {
         let before = try await fingerprint(of: database)
         try await backUp()
-        _ = try await service.rawQuery("CREATE DATABASE `\(copy)` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci")
+        _ = try await service.rawQuery("CREATE DATABASE `\(copy)`")
 
         let restore = DatabaseRestoreViewModel(service: service, database: DatabaseInfo(name: copy))
         restore.inputFileURL = dumpURL
@@ -111,10 +113,8 @@ final class BackupRoundTripTests: XCTestCase {
 
         assertSame(try await fingerprint(of: database), before)
         var restored = try await fingerprint(of: copy)
-        var original = before
-        restored["database"] = nil
-        original["database"] = nil
-        assertSame(restored, original)
+        restored["database"] = restored["database"]?.replacingOccurrences(of: copy, with: database)
+        assertSame(restored, before)
     }
 
     /// Each page of a composite key is read as a range of the key's index:

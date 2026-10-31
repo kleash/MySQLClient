@@ -62,10 +62,12 @@ final class DatabaseRestoreViewModel: ObservableObject {
     /// `useDatabaseNamedInFile` is on the only one it touches.
     let database: DatabaseInfo
     @Published var inputFileURL: URL?
-    /// Off (the default): everything goes into `database`, and the file's
-    /// own USE, CREATE DATABASE and DROP DATABASE statements are skipped, so
-    /// it can't touch the database it was made from. On: the file decides,
-    /// starting in `database`, as `mysql <database> < file` would.
+    /// Off (the default): everything goes into `database`. The file's own
+    /// USE, CREATE DATABASE and DROP DATABASE statements are skipped, so it
+    /// can't touch the database it was made from, and the character set and
+    /// collation its CREATE and ALTER DATABASE set go to `database` instead
+    /// (`intoChosenDatabase`). On: the file decides, starting in `database`,
+    /// as `mysql <database> < file` would.
     @Published var useDatabaseNamedInFile = false
     @Published var stopOnFirstError = true
     @Published private(set) var isRunning = false
@@ -114,18 +116,34 @@ final class DatabaseRestoreViewModel: ObservableObject {
         restoreTask?.cancel()
     }
 
-    /// The file's own USE, CREATE, DROP and ALTER DATABASE statements
-    /// (also inside mysqldump's `/*!40000 … */`), which pick, replace or
-    /// change the database the file was made from. mysqldump writes
-    /// `ALTER DATABASE <its database>` around a routine made under another
-    /// database collation: run while restoring elsewhere, it would change
-    /// the original.
-    static func choosesDatabase(_ statement: String) -> Bool {
-        statement.range(
-            of: #"^(/\*!\d*\s*)?(USE|(CREATE|DROP|ALTER)\s+(DATABASE|SCHEMA))\b"#,
-            options: [.regularExpression, .caseInsensitive]
-        ) != nil
+    /// What runs in place of `statement` when the file goes into `database`
+    /// rather than its own (`useDatabaseNamedInFile` off). The file's own
+    /// USE, DROP DATABASE and CREATE DATABASE (also inside mysqldump's
+    /// `/*!40000 … */`) pick or replace the database it was made from, so
+    /// they are skipped (`nil`); but the character set and collation a
+    /// CREATE or ALTER DATABASE sets go to the current database, `database`,
+    /// through an ALTER DATABASE without the name. So the copy gets them,
+    /// as do its routines, triggers and events (mysqldump sets the database
+    /// collation each was made under around it), and the original keeps
+    /// its own. Anything else runs as it is.
+    static func intoChosenDatabase(_ statement: String) -> String? {
+        guard let match = statement.prefixMatch(of: databaseStatement) else { return statement }
+        let verb = match.verb?.uppercased() ?? "USE"
+        if verb == "ALTER", match.name == nil { return statement }
+        let setsCharacterSet = match.settings.contains(/(?i)\b(CHARACTER|CHARSET|COLLATE)\b/)
+        guard match.name != nil, verb == "ALTER" || (verb.hasPrefix("CREATE") && setsCharacterSet) else { return nil }
+        return (match.opener ?? "") + "ALTER DATABASE " + match.settings
     }
+
+    private static let databaseStatement = #/
+        (?i) (?<opener> /\*!\d* \s* )?
+        (?: USE \b
+          | (?<verb> CREATE (?: \s+ OR \s+ REPLACE )? | DROP | ALTER ) \s+ (?: DATABASE | SCHEMA ) \b
+            (?: \s+ IF (?: \s+ NOT )? \s+ EXISTS \b | \s* /\*!\d* \s* IF \s+ NOT \s+ EXISTS \s* \*/ )? )
+        \s* (?<name> `(?: [^`] | `` )*` | "(?: [^"] | "" )*"
+                   | (?! (?: DEFAULT | CHARACTER | CHARSET | COLLATE | COMMENT | ENCRYPTION | READ ) \b ) [\w$]+ )?
+        \s* (?<settings> (?s: .* ) )
+        /#
 
     private func performRestore() async {
         defer { isRunning = false; restoreTask = nil }
@@ -173,8 +191,8 @@ final class DatabaseRestoreViewModel: ObservableObject {
                     guard let text = String(bytes: statement.sql, encoding: .utf8) else {
                         throw RestoreError.notUTF8(line: line)
                     }
-                    let sql = text.trimmingCharacters(in: .whitespacesAndNewlines)
-                    if sql.isEmpty || (!useDatabaseNamedInFile && Self.choosesDatabase(sql)) { continue }
+                    let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard let sql = useDatabaseNamedInFile ? trimmed : Self.intoChosenDatabase(trimmed), !sql.isEmpty else { continue }
                     do {
                         _ = try await connection.textQuery(sql)
                         current.statementsRun += 1
