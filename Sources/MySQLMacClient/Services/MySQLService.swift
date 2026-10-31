@@ -170,7 +170,7 @@ actor MySQLService {
         reconnectsAutomatically = false
     }
 
-    private static func tlsConfiguration(_ mode: TLSMode) -> TLSConfiguration {
+    static func tlsConfiguration(_ mode: TLSMode) -> TLSConfiguration {
         var configuration = TLSConfiguration.makeClientConfiguration()
         if mode == .required {
             configuration.certificateVerification = .none
