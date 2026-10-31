@@ -19,7 +19,9 @@ enum DatabaseBackupMode: String, CaseIterable, Identifiable {
 /// during the dump. A single transaction by default: without it, a backup
 /// of a database in use reads each table at a different moment and can
 /// hold rows that never existed together (an order without its items).
-/// It doesn't block writers the way `lockTablesForReading` does.
+/// It doesn't block writers the way `lockTablesForReading` does, but it
+/// covers InnoDB tables only: another engine's (Aria, MyISAM) are read as
+/// they are at each read, which only `lockTablesForReading` prevents.
 ///
 /// Deliberately just these two: a third checkbox in the reference image
 /// ("Dump öncesi logları temizle") mapped to `RESET MASTER` in real MySQL —

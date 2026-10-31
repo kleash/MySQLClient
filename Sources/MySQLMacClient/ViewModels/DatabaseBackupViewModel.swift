@@ -271,6 +271,18 @@ final class DatabaseBackupViewModel: ObservableObject {
             selectedEvents = []
             noteListFailure(error)
         }
+
+        // A single transaction reads InnoDB tables from one snapshot, but
+        // another engine's (Aria, MyISAM) as they are at each read, so a
+        // backup could hold an order's items without the order.
+        let notInnoDB = (try? await service.query(
+            "SELECT TABLE_NAME AS name FROM information_schema.TABLES WHERE TABLE_SCHEMA = ? AND ENGINE <> 'InnoDB' ORDER BY TABLE_NAME",
+            [MySQLData(string: database.name)]
+        ))?.compactMap { $0.column("name")?.string } ?? []
+        if !notInnoDB.isEmpty {
+            let note = String(localized: "Not InnoDB, so \"Single transaction\" can't read them from one snapshot (\"Lock tables for reading\" can): \(notInnoDB.joined(separator: ", "))")
+            loadWarning = [loadWarning, note].compactMap { $0 }.joined(separator: "\n")
+        }
     }
 
     func selectAllObjects() {

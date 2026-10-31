@@ -166,6 +166,17 @@ final class DatabaseBackupViewModelTests: XCTestCase {
         XCTAssertNotNil(viewModel.loadWarning, "the events that couldn't be listed")
     }
 
+    /// A single transaction reads only InnoDB tables from one snapshot: the
+    /// dialog names the others (`widgets` is Aria).
+    func testLoadObjectsNamesTablesASingleTransactionCantSnapshot() async throws {
+        let viewModel = makeViewModel()
+        await viewModel.loadDatabasesAndObjects()
+
+        let warning = try XCTUnwrap(viewModel.loadWarning)
+        XCTAssertTrue(warning.contains("widgets"))
+        XCTAssertFalse(warning.contains("tags"), "an InnoDB table")
+    }
+
     func testSelectNoneThenSelectAllRestoresFullSelection() async throws {
         let viewModel = makeViewModel()
         await viewModel.loadDatabasesAndObjects()
