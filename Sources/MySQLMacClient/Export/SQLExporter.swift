@@ -108,8 +108,13 @@ enum SQLExporter {
         guard let value else { return "NULL" }
         let bytes = Data(value.readableBytesView)
         switch column.columnType {
-        case .tiny, .short, .long, .longlong, .int24, .year, .float, .double, .decimal, .newdecimal:
+        case .tiny, .short, .long, .longlong, .int24, .year, .decimal, .newdecimal:
             return String(decoding: bytes, as: UTF8.self)
+        case .float, .double:
+            // The server prints negative zero as -0, which reads back as the
+            // integer 0.
+            let text = String(decoding: bytes, as: UTF8.self)
+            return text == "-0" ? "-0e0" : text
         case .date, .newdate, .datetime, .timestamp, .time, .json:
             return "'\(escapeStringLiteral(String(decoding: bytes, as: UTF8.self)))'"
         default:

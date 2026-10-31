@@ -632,9 +632,10 @@ final class DatabaseBackupViewModel: ObservableObject {
         // FLOAT is read as DOUBLE: the server prints a FLOAT with only six
         // significant digits (16777216 as 16777200), while the DOUBLE holds
         // its exact value, which converts back to the very same FLOAT.
+        // Multiplied by 1 rather than added to 0, which turns -0 into 0.
         let selectExpressions = columns.map { column in
             column.mysqlType.lowercased().hasPrefix("float")
-                ? "\(SQLExporter.quoted(column.name)) + 0e0"
+                ? "\(SQLExporter.quoted(column.name)) * 1e0"
                 : SQLExporter.quoted(column.name)
         }
         let selectList = selectExpressions.joined(separator: ", ")

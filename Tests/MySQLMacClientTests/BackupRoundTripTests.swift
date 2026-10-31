@@ -383,6 +383,10 @@ final class BackupRoundTripTests: XCTestCase {
         "INSERT INTO no_key_ties VALUES " + [("a", 12), ("A", 11), ("á", 4), ("Á", 3), ("a ", 2)]
             .flatMap { Array(repeating: "('\($0)')", count: $1) }.joined(separator: ", "),
 
+        // Negative zero, which the integer literal -0 would store as 0.
+        "CREATE TABLE negative_zero (id INT PRIMARY KEY, f FLOAT, d DOUBLE)",
+        "INSERT INTO negative_zero VALUES (1, -0e0, -0e0), (2, 0e0, 0e0)",
+
         // ---- End of values and paging, continued ----
 
         // Names that need quoting.
