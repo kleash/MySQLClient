@@ -47,7 +47,7 @@ enum AnalyticsService {
     }
 
     private static func track(event: String, feature: String? = nil, errorCode: Int? = nil) {
-        guard !SettingsStore.shared.settings.general.analyticsOptOut else { return }
+        guard !SettingsStore.shared.settings.general.analyticsOptOut, !isRunningTests else { return }
 
         let payload = Payload(
             deviceID: deviceID(),
@@ -73,6 +73,10 @@ enum AnalyticsService {
             _ = try? await URLSession.shared.data(for: request)
         }
     }
+
+    /// Test runs exercise the same code paths as real use (a backup ends in
+    /// `trackFeatureUsed("db_backup")`), and must not count as usage.
+    static let isRunningTests = NSClassFromString("XCTestCase") != nil
 
     private static func deviceID() -> String {
         let defaults = UserDefaults.standard
