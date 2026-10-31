@@ -29,6 +29,19 @@ final class MySQLServiceRawQueryTests: XCTestCase {
         try await service.disconnect()
     }
 
+    /// MySQLNIO asks for collation 255 (`utf8mb4_0900_ai_ci`) at login,
+    /// which only MySQL 8 knows: MariaDB falls back to its own default,
+    /// often latin1, and then stores the UTF-8 the app sends as if it were
+    /// latin1 text. Reading it back through the same wrong setting hides
+    /// that; the bytes on disk (`HEX`) don't.
+    func testTextIsStoredAsUTF8OnEveryServer() async throws {
+        _ = try await service.rawQuery("CREATE TEMPORARY TABLE charset_probe (v VARCHAR(10) CHARACTER SET utf8mb4)")
+        try await service.execute("INSERT INTO charset_probe VALUES (?)", [MySQLData(string: "é😀")])
+        let rows = try await service.query("SELECT HEX(v) AS stored, @@character_set_client AS client FROM charset_probe")
+        XCTAssertEqual(rows.first?.column("stored")?.string, "C3A9F09F9880")
+        XCTAssertEqual(rows.first?.column("client")?.string, "utf8mb4")
+    }
+
     func testRawQuerySelectReturnsRowsAndNoAffectedCount() async throws {
         let result = try await service.rawQuery("SELECT name, quantity FROM widgets ORDER BY name ASC")
         XCTAssertEqual(result.rows.count, 3)

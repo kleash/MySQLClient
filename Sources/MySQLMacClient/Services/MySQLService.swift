@@ -100,6 +100,16 @@ actor MySQLService {
                 tlsConfiguration: nil,
                 on: eventLoop
             ).get()
+            // MySQLNIO's login asks for collation 255, which only MySQL 8
+            // knows; MariaDB silently falls back to its default (often
+            // latin1) and would then store the UTF-8 this app sends as
+            // double-encoded text. Every reconnect comes through here too.
+            do {
+                _ = try await conn.simpleQuery("SET NAMES utf8mb4").get()
+            } catch {
+                try? await conn.close().get()
+                throw error
+            }
             self.eventLoopGroup = group
             self.connection = conn
             self.isConnected = true
