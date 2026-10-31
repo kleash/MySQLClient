@@ -1,4 +1,6 @@
 import Foundation
+import MySQLNIO
+import NIOCore
 
 /// Schema + data: a `CREATE TABLE IF NOT EXISTS` (built from the server's
 /// own `SHOW CREATE TABLE` output — see `SchemaIntrospectionService
@@ -76,9 +78,43 @@ enum SQLExporter {
     /// backslash-escaping is safe (MySQL accepts both escaping styles for a
     /// literal quote simultaneously), whereas the reverse order would
     /// re-mangle the backslashes this same pass just inserted.
+    ///
+    /// NUL, line breaks and Ctrl-Z are written as `\0`, `\n`, `\r` and
+    /// `\Z`, the way mysqldump writes them: the `mysql` client refuses a raw
+    /// NUL in a script, and a value with its own line breaks would otherwise
+    /// spread one statement over many lines of the file.
     static func escapeStringLiteral(_ raw: String) -> String {
         raw.replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "'", with: "''")
+            .replacingOccurrences(of: "\0", with: "\\0")
+            .replacingOccurrences(of: "\n", with: "\\n")
+            .replacingOccurrences(of: "\r", with: "\\r")
+            .replacingOccurrences(of: "\u{1A}", with: "\\Z")
+    }
+
+    /// One value as the server sent it over the text protocol
+    /// (`MySQLService.textQuery`), written so it reads back as exactly the
+    /// same value: numbers as the server's own digits rather than through
+    /// `Double`, dates and times as the server's own text (fractions of a
+    /// second, TIME beyond a day or below zero, zero dates), binary
+    /// strings, BIT and geometry as hex, and everything else quoted.
+    static func sqlLiteral(_ value: ByteBuffer?, column: MySQLProtocol.ColumnDefinition41) -> String {
+        guard let value else { return "NULL" }
+        let bytes = Data(value.readableBytesView)
+        switch column.columnType {
+        case .tiny, .short, .long, .longlong, .int24, .year, .float, .double, .decimal, .newdecimal:
+            return String(decoding: bytes, as: UTF8.self)
+        case .date, .newdate, .datetime, .timestamp, .time, .json:
+            return "'\(escapeStringLiteral(String(decoding: bytes, as: UTF8.self)))'"
+        default:
+            // Numbers and dates report the binary character set as well,
+            // which is why they're handled above and only this branch
+            // goes by it.
+            if column.characterSet == .binary {
+                return hexLiteral(bytes)
+            }
+            return "'\(escapeStringLiteral(String(decoding: bytes, as: UTF8.self)))'"
+        }
     }
 
     /// MySQL's native binary literal syntax — used for `.blob` values
@@ -147,10 +183,27 @@ enum SQLExporter {
         maxRowsPerStatement: Int = 500,
         maxStatementByteBudget: Int = 512_000
     ) -> [String] {
-        guard !rows.isEmpty else { return [] }
-        let qualified = "\(quoted(database)).\(quoted(table))"
-        let columnList = columns.map { quoted($0.name) }.joined(separator: ", ")
-        let prefix = "INSERT INTO \(qualified) (\(columnList)) VALUES "
+        insertStatements(
+            into: "\(quoted(database)).\(quoted(table))",
+            columnNames: columns.map(\.name),
+            literalRows: rows.map { $0.map(sqlLiteral) },
+            maxRowsPerStatement: maxRowsPerStatement,
+            maxStatementByteBudget: maxStatementByteBudget
+        )
+    }
+
+    /// `extendedInsertStatements` for rows whose values are already SQL
+    /// literals. `maxRowsPerStatement: 1` gives one INSERT per row.
+    static func insertStatements(
+        into qualifiedTable: String,
+        columnNames: [String],
+        literalRows: [[String]],
+        maxRowsPerStatement: Int = 500,
+        maxStatementByteBudget: Int = 512_000
+    ) -> [String] {
+        guard !literalRows.isEmpty else { return [] }
+        let columnList = columnNames.map(quoted).joined(separator: ", ")
+        let prefix = "INSERT INTO \(qualifiedTable) (\(columnList)) VALUES "
 
         var statements: [String] = []
         var currentTuples: [String] = []
@@ -163,8 +216,8 @@ enum SQLExporter {
             currentByteCount = prefix.utf8.count
         }
 
-        for row in rows {
-            let tuple = "(" + row.map(sqlLiteral).joined(separator: ", ") + ")"
+        for row in literalRows {
+            let tuple = "(" + row.joined(separator: ", ") + ")"
             let tupleBytes = tuple.utf8.count + (currentTuples.isEmpty ? 0 : 2) // ", " separator
             let wouldExceedRowCap = currentTuples.count >= maxRowsPerStatement
             let wouldExceedByteCap = !currentTuples.isEmpty && currentByteCount + tupleBytes > maxStatementByteBudget

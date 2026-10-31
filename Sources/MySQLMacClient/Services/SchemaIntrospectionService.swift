@@ -54,7 +54,11 @@ struct SchemaIntrospectionService {
                 isPrimaryKey: primaryKeyColumns.contains(name),
                 isAutoIncrement: extra.localizedCaseInsensitiveContains("auto_increment"),
                 defaultValue: row.column("Default")?.string,
-                comment: (comment?.isEmpty ?? true) ? nil : comment
+                comment: (comment?.isEmpty ?? true) ? nil : comment,
+                // "VIRTUAL GENERATED"/"STORED GENERATED", or MariaDB's
+                // "PERSISTENT"; not MySQL's "DEFAULT_GENERATED", which only
+                // marks an expression default.
+                isGenerated: extra.contains("VIRTUAL") || extra.contains("STORED GENERATED") || extra.contains("PERSISTENT")
             )
         }
     }

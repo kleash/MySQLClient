@@ -146,6 +146,19 @@ actor MySQLService {
         }
     }
 
+    /// `query` over the text protocol, which carries every value as the
+    /// server's own text. The binary protocol `query` uses is lossy for
+    /// some types once decoded (DECIMAL, BIT wider than 8 bits, YEAR,
+    /// TIME), so a backup, which has to write values back exactly, reads
+    /// with this instead. Takes no binds.
+    func textQuery(_ sql: String) async throws -> [MySQLRow] {
+        try await withRetryOnClosedConnection {
+            try await self.withExclusiveConnectionAccess { conn in
+                try await conn.simpleQuery(sql).get()
+            }
+        }
+    }
+
     @discardableResult
     func execute(_ sql: String, _ binds: [MySQLData] = []) async throws -> ExecuteResult {
         try await withRetryOnClosedConnection {

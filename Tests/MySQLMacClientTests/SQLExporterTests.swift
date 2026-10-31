@@ -31,6 +31,7 @@ final class SQLExporterTests: XCTestCase {
     func testStringLiteralEscaping() {
         XCTAssertEqual(SQLExporter.escapeStringLiteral("O'Brien"), "O''Brien")
         XCTAssertEqual(SQLExporter.escapeStringLiteral("C:\\path"), "C:\\\\path")
+        XCTAssertEqual(SQLExporter.escapeStringLiteral("a\0b\u{1A}c\r\nd"), "a\\0b\\Zc\\r\\nd")
     }
 
     func testBlobRendersAsHexLiteral() {

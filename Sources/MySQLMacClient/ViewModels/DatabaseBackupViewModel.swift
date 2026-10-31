@@ -474,50 +474,63 @@ final class DatabaseBackupViewModel: ObservableObject {
         }
     }
 
-    /// Read one page at a time rather than `SELECT *` over the whole table.
+    /// Read one page at a time rather than the whole table in one query.
     ///
     /// MySQLNIO has no streaming API — a single un-LIMITed `SELECT` buffers
-    /// every row in memory before returning, then this view model copies
-    /// them into `[[RowValue]]`, then again into INSERT text. On a big
-    /// table (a real one this hit: a multi-million-row address table) that
-    /// tripled footprint is enough to exhaust memory and have the server
-    /// drop the connection mid-read — which in a debug build then trips
-    /// MySQLNIO's own `assert(statementID == nil)` in
+    /// every row in memory before returning, then this view model turns
+    /// them into INSERT text. On a big table (a real one this hit: a
+    /// multi-million-row address table) that footprint is enough to exhaust
+    /// memory and have the server drop the connection mid-read — which in a
+    /// debug build then trips MySQLNIO's own `assert(statementID == nil)` in
     /// `MySQLQueryCommand.deinit`, taking the whole app down. Paging keeps
     /// each round trip small and bounded, so neither side is ever asked to
     /// hold the entire table at once.
     ///
     /// Pages by **primary key** (`WHERE (pk) > (lastPage'sLastPk)`), not by
-    /// `OFFSET`, whenever the table has one. `OFFSET n` makes the server
-    /// walk and discard all n preceding rows on every single page, so
+    /// `OFFSET`, whenever the table has one. `OFFSET n` makes the
+    /// server walk and discard all n preceding rows on every single page, so
     /// dumping a whole table that way costs O(rows²) — measured on this
     /// project's own test server at 400k rows, the last page took 1.659s
     /// with `OFFSET` versus 0.038s with a key range, and the gap widens
     /// with size. A key range seeks straight into the index instead, which
     /// is what keeps a multi-million-row table (the real one that prompted
     /// this: ~1.15M rows) finishing in seconds rather than tens of minutes.
+    /// The last key goes back to the server exactly as it came
+    /// (`SQLExporter.sqlLiteral`): a rounded DATETIME(6) or DECIMAL key
+    /// would ask for the same page again forever.
     ///
     /// Ordering also makes paging *correct*, not just fast: `LIMIT` across
     /// separate queries has no row-order guarantee without an `ORDER BY`,
-    /// so rows could otherwise repeat or vanish between pages.
+    /// so rows could otherwise repeat or vanish between pages. A table with
+    /// no primary key is ordered by every column, so only rows that are identical
+    /// (and so interchangeable) can trade places — the slow path, but such
+    /// tables are rare and typically small.
     ///
-    /// Tables with no primary key have nothing to seek on and fall back to
-    /// `OFFSET` — acceptable because that's rare and such tables are
-    /// typically small, but it is the slow path.
+    /// Columns are named rather than `SELECT *`, which leaves out
+    /// invisible columns, and generated ones are skipped: the server
+    /// computes them and refuses an INSERT that names them.
     private func dumpTableData(_ table: TableInfo, to fileHandle: FileHandle) async throws {
-        let columns = try await introspection.columns(forTable: table.name, inDatabase: database.name)
+        let allColumns = try await introspection.columns(forTable: table.name, inDatabase: database.name)
+        let columns = allColumns.filter { !$0.isGenerated }
         let qualifiedTable = try SchemaIntrospectionService.qualifiedIdentifier(database: database.name, name: table.name)
+        // FLOAT is read as DOUBLE: the server prints a FLOAT with only six
+        // significant digits (16777216 as 16777200), while the DOUBLE holds
+        // its exact value, which converts back to the very same FLOAT.
+        let selectList = columns.map { column in
+            column.mysqlType.lowercased().hasPrefix("float")
+                ? "\(SQLExporter.quoted(column.name)) + 0e0"
+                : SQLExporter.quoted(column.name)
+        }.joined(separator: ", ")
 
-        let keyColumns = columns.filter(\.isPrimaryKey)
-        let quotedKeyList = try keyColumns
-            .map { try SchemaIntrospectionService.quotedIdentifier($0.name) }
-            .joined(separator: ", ")
+        let keyColumnNames = allColumns.filter(\.isPrimaryKey).map(\.name)
         // Resolved once: which positions in a fetched row carry the key
         // values that seed the next page's `WHERE`.
-        let keyIndexes = keyColumns.compactMap { key in columns.firstIndex { $0.name == key.name } }
-        let canSeekByKey = !keyColumns.isEmpty && keyIndexes.count == keyColumns.count
+        let keyIndexes = keyColumnNames.compactMap { key in columns.firstIndex { $0.name == key } }
+        let canSeekByKey = !keyColumnNames.isEmpty && keyIndexes.count == keyColumnNames.count
+        let quotedKeyList = keyColumnNames.map(SQLExporter.quoted).joined(separator: ", ")
+        let orderList = canSeekByKey ? quotedKeyList : selectList
 
-        var lastKeyValues: [RowValue]?
+        var lastKeyLiterals: [String]?
         var offset = 0
         var rowsWritten = 0
         var wroteAnyRows = false
@@ -525,27 +538,23 @@ final class DatabaseBackupViewModel: ObservableObject {
         while true {
             try Task.checkCancellation()
 
-            var sql = "SELECT * FROM \(qualifiedTable)"
-            if canSeekByKey {
-                if let lastKeyValues {
-                    // Row-constructor comparison, so a composite key pages
-                    // correctly as one ordered tuple rather than needing a
-                    // hand-expanded chain of ORs.
-                    let literals = lastKeyValues.map(SQLExporter.sqlLiteral).joined(separator: ", ")
-                    sql += " WHERE (\(quotedKeyList)) > (\(literals))"
-                }
-                sql += " ORDER BY \(quotedKeyList)"
+            var sql = "SELECT \(selectList) FROM \(qualifiedTable)"
+            if canSeekByKey, let lastKeyLiterals {
+                // Row-constructor comparison, so a composite key pages
+                // correctly as one ordered tuple rather than needing a
+                // hand-expanded chain of ORs.
+                sql += " WHERE (\(quotedKeyList)) > (\(lastKeyLiterals.joined(separator: ", ")))"
             }
-            sql += " LIMIT \(dataPageSize)"
+            sql += " ORDER BY \(orderList) LIMIT \(dataPageSize)"
             if !canSeekByKey {
                 sql += " OFFSET \(offset)"
             }
 
-            let mysqlRows = try await service.query(sql)
+            let mysqlRows = try await service.textQuery(sql)
             guard !mysqlRows.isEmpty else { break }
 
-            let rows: [[RowValue]] = mysqlRows.map { row in
-                columns.map { column in row.column(column.name).map(RowValue.init(mysqlData:)) ?? .null }
+            let rows: [[String]] = mysqlRows.map { row in
+                zip(row.columnDefinitions, row.values).map { SQLExporter.sqlLiteral($1, column: $0) }
             }
 
             // Deferred until the first page actually arrives, so an empty
@@ -557,20 +566,19 @@ final class DatabaseBackupViewModel: ObservableObject {
                 }
             }
 
-            if options.file.useExtendedInserts {
-                for statement in SQLExporter.extendedInsertStatements(database: database.name, table: table.name, columns: columns, rows: rows) {
-                    fileHandle.write(Data((statement + "\n").utf8))
-                }
-            } else {
-                for row in rows {
-                    let statement = SQLExporter.insertStatement(database: database.name, table: table.name, columns: columns, values: row)
-                    fileHandle.write(Data((statement + "\n").utf8))
-                }
+            let statements = SQLExporter.insertStatements(
+                into: qualifiedTable,
+                columnNames: columns.map(\.name),
+                literalRows: rows,
+                maxRowsPerStatement: options.file.useExtendedInserts ? 500 : 1
+            )
+            for statement in statements {
+                fileHandle.write(Data((statement + "\n").utf8))
             }
 
             rowsWritten += rows.count
             if canSeekByKey, let lastRow = rows.last {
-                lastKeyValues = keyIndexes.map { lastRow[$0] }
+                lastKeyLiterals = keyIndexes.map { lastRow[$0] }
             } else {
                 offset += rows.count
             }

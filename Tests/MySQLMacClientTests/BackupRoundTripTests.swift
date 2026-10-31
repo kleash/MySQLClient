@@ -177,14 +177,66 @@ final class BackupRoundTripTests: XCTestCase {
         "CREATE TABLE ai_not_primary (code VARCHAR(10) NOT NULL PRIMARY KEY, seq INT NOT NULL AUTO_INCREMENT, UNIQUE KEY (seq))",
         "INSERT INTO ai_not_primary VALUES ('b', 3), ('a', 9)",
 
-        // Integers at the edges of their types.
-        "CREATE TABLE integers (id INT PRIMARY KEY, big BIGINT, tiny TINYINT, small_unsigned SMALLINT UNSIGNED)",
+        // Numbers at the edges of their types.
         """
-        INSERT INTO integers VALUES
-            (1, -9223372036854775808, -128, 65535),
-            (2, 9223372036854775807, 127, 0),
-            (3, NULL, NULL, NULL)
+        CREATE TABLE numbers (
+            id INT PRIMARY KEY, wide DECIMAL(65,30), money DECIMAL(20,6), negative DECIMAL(10,2),
+            ubig BIGINT UNSIGNED, sbig BIGINT, small_unsigned SMALLINT UNSIGNED, tiny TINYINT,
+            flag BIT(1), mask BIT(64), f FLOAT, d DOUBLE, y YEAR
+        )
         """,
+        """
+        INSERT INTO numbers VALUES
+            (1, '12345678901234567890123456789012345.123456789012345678901234567890', '99999999999999.999999', -0.01,
+             18446744073709551615, -9223372036854775808, 65535, -128,
+             b'1', b'1111111111111111111111111111111111111111111111111111111111111111', 1.2345678, 0.30000000000000004, 2155),
+            (2, 0, 0.000001, 0, 0, 9223372036854775807, 0, 127, b'0', b'1010', 16777216, 1.7976931348623157e308, 1901),
+            (3, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, -3.4e38, NULL, NULL),
+            (4, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL)
+        """,
+        "CREATE TABLE float_key (f FLOAT PRIMARY KEY)",
+        "INSERT INTO float_key VALUES " + (1...20).map { "(\(Double($0) + 0.1234567))" }.joined(separator: ", "),
+
+        // Dates and times: fractions of a second, TIME beyond a day and
+        // below zero, and zero dates.
+        """
+        CREATE TABLE temporal (
+            id INT PRIMARY KEY, fine DATETIME(6), plain DATETIME, stamp TIMESTAMP(3) NULL, day DATE,
+            duration TIME(6), negative TIME, zero_datetime DATETIME NULL, zero_date DATE NULL
+        )
+        """,
+        """
+        INSERT INTO temporal VALUES
+            (1, '2024-02-29 23:59:59.123456', '1000-01-01 00:00:00', '2024-03-31 01:30:00.500', '9999-12-31',
+             '838:59:59.000000', '-12:30:00', '0000-00-00 00:00:00', '0000-00-00'),
+            (2, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL)
+        """,
+
+        // Strings: multi-byte text, another character set, binary with
+        // trailing zero bytes, bytes that aren't UTF-8 next to bytes that
+        // are, and every character a SQL literal has to escape.
+        """
+        CREATE TABLE strings (
+            id INT PRIMARY KEY, utf VARCHAR(50) CHARACTER SET utf8mb4, latin VARCHAR(50) CHARACTER SET latin1,
+            fixed CHAR(5), bin VARBINARY(10), raw BLOB, txt TEXT, choice ENUM('a', 'b,c', 'd''e'), flags SET('x', 'y', 'z')
+        )
+        """,
+        """
+        INSERT INTO strings VALUES
+            (1, '😀 ünïcödé 中文', 'café', 'ab', X'00410000', X'FFFE00C3',
+             CONCAT('quote '' backslash \\\\ nul ', CHAR(0), ' ctrl-z ', CHAR(26), ' crlf ', CHAR(13), CHAR(10), ' tab ', CHAR(9)),
+             'b,c', 'x,z'),
+            (2, '', '', '', X'', X'68656C6C6F', '', 'd''e', ''),
+            (3, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL)
+        """,
+        "CREATE TABLE big_blob (id INT PRIMARY KEY, payload LONGBLOB)",
+        "INSERT INTO big_blob VALUES (1, REPEAT(X'00FF7F80', 786432))",
+        "CREATE TABLE shapes (id INT PRIMARY KEY, shape GEOMETRY NULL)",
+        "INSERT INTO shapes VALUES (1, ST_GeomFromText('POINT(1.5 -2.25)')), (2, ST_GeomFromText('LINESTRING(0 0, 1 1, 2 0)')), (3, NULL)",
+
+        // Generated columns, which an INSERT must not name.
+        "CREATE TABLE computed (id INT PRIMARY KEY, a INT, doubled INT AS (a * 2) VIRTUAL, plus_one INT AS (a + 1) STORED)",
+        "INSERT INTO computed (id, a) VALUES (1, 10), (2, NULL)",
 
         // Foreign keys: a child that sorts before its parent, and a table
         // that references itself.
@@ -197,9 +249,17 @@ final class BackupRoundTripTests: XCTestCase {
         "CREATE TABLE checked (id INT PRIMARY KEY, qty INT, CONSTRAINT qty_not_negative CHECK (qty >= 0))",
         "INSERT INTO checked VALUES (1, 0), (2, 5)",
 
-        // Paging: rows across several pages, by a composite key.
+        // Paging: rows across many pages with no key to seek on (including
+        // exact duplicates), by a composite key, and by keys a rounded
+        // literal would never get past.
+        "CREATE TABLE no_key (v INT, w VARCHAR(10))",
+        "INSERT INTO no_key VALUES " + (0..<30).map { "(\($0 % 4), 'dup')" }.joined(separator: ", "),
         "CREATE TABLE composite_key (a INT, b VARCHAR(10), v INT, PRIMARY KEY (a, b))",
         "INSERT INTO composite_key VALUES (1, 'a', 1), (1, 'b', 2), (1, 'c', 3), (2, 'a', 4), (2, 'b', 5), (3, 'a', 6), (3, 'b', 7), (3, 'c', 8), (4, 'a', 9), (5, 'a', 10)",
+        "CREATE TABLE fractional_key (at DATETIME(6) PRIMARY KEY, v INT)",
+        "INSERT INTO fractional_key VALUES " + (1...20).map { "('2024-01-01 00:00:00.\(String(format: "%06d", $0))', \($0))" }.joined(separator: ", "),
+        "CREATE TABLE decimal_key (k DECIMAL(30,20) PRIMARY KEY, v INT)",
+        "INSERT INTO decimal_key VALUES " + (1...20).map { "(1.\(String(format: "%020d", $0)), \($0))" }.joined(separator: ", "),
 
         // Names that need quoting.
         "CREATE TABLE `select` (`from` INT PRIMARY KEY, `order` VARCHAR(5))",

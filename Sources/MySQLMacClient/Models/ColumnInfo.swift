@@ -11,6 +11,9 @@ struct ColumnInfo: Identifiable, Equatable, Hashable {
     /// Column comment (from `SHOW FULL COLUMNS`). Defaulted so the many
     /// existing call sites that don't care about comments keep compiling.
     var comment: String? = nil
+    /// A generated (computed) column, whose value the server works out
+    /// itself and which an INSERT must not name.
+    var isGenerated = false
 
     /// `TEXT`/`BLOB`-family columns, which the grid shows as a `<N bytes>`
     /// placeholder and edits in the value editor instead of inline.
