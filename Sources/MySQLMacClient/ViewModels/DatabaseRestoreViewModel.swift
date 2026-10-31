@@ -143,19 +143,30 @@ final class DatabaseRestoreViewModel: ObservableObject {
             }
 
             var splitter = DelimiterScript.Splitter()
+            splitter.noBackslashEscapes = try await Self.hasNoBackslashEscapes(connection)
             var current = Progress(bytesRead: 0, totalBytes: totalBytes, statementsRun: 0)
             progress = current
             var reachedEnd = false
             var readSize = readChunkSize
-            while !reachedEnd {
-                let chunk = try file.read(upToCount: readSize) ?? Data()
-                reachedEnd = chunk.isEmpty
-                current.bytesRead += Int64(chunk.count)
-                let statements = reachedEnd ? splitter.finish() : splitter.feed(chunk)
-                // The splitter scans an unfinished statement again from its
-                // start with each read; doubling the read until it ends
-                // keeps a statement far bigger than one read linear to scan.
-                readSize = statements.isEmpty ? readSize * 2 : readChunkSize
+            var statements: [(sql: [UInt8], line: Int)] = []
+            repeat {
+                // The splitter stops after a statement that mentions
+                // sql_mode: what it holds after that is split the way the
+                // server now reads backslashes, before more is read.
+                if let last = statements.last, DelimiterScript.mentionsSQLMode(last.sql[...]) {
+                    splitter.noBackslashEscapes = try await Self.hasNoBackslashEscapes(connection)
+                    statements = reachedEnd ? splitter.finish() : splitter.feed(Data())
+                } else {
+                    let chunk = try file.read(upToCount: readSize) ?? Data()
+                    reachedEnd = chunk.isEmpty
+                    current.bytesRead += Int64(chunk.count)
+                    statements = reachedEnd ? splitter.finish() : splitter.feed(chunk)
+                    // The splitter scans an unfinished statement again from
+                    // its start with each read; doubling the read until it
+                    // ends keeps a statement far bigger than one read linear
+                    // to scan.
+                    readSize = statements.isEmpty ? readSize * 2 : readChunkSize
+                }
                 for statement in statements {
                     line = statement.line + 1
                     if Task.isCancelled { throw RestoreError.cancelled(line: line) }
@@ -178,7 +189,7 @@ final class DatabaseRestoreViewModel: ObservableObject {
                     }
                 }
                 progress = current
-            }
+            } while !reachedEnd || !statements.isEmpty
 
             if statementErrors.isEmpty {
                 didFinishSuccessfully = true
@@ -194,6 +205,13 @@ final class DatabaseRestoreViewModel: ObservableObject {
             AnalyticsService.trackError(error, feature: "db_restore")
         }
         try? await target?.disconnect()
+    }
+
+    /// Whether the session's sql_mode has NO_BACKSLASH_ESCAPES, which the
+    /// mysql client reads from the server's status to split a file.
+    private static func hasNoBackslashEscapes(_ connection: MySQLService) async throws -> Bool {
+        let mode = try await connection.textQuery("SELECT @@SESSION.sql_mode AS mode").first?.column("mode")?.string
+        return mode?.contains("NO_BACKSLASH_ESCAPES") ?? false
     }
 
     private func describe(_ error: Error) -> String {

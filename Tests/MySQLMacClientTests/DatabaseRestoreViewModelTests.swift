@@ -91,6 +91,53 @@ final class DatabaseRestoreViewModelTests: XCTestCase {
         XCTAssertEqual(restored, [])
     }
 
+    /// Routines made under NO_BACKSLASH_ESCAPES, as mysqldump, HeidiSQL and
+    /// this app's backup write them: after the file's SET sql_mode, `'C:\'`
+    /// is a whole string, as the mysql client reads it from the server's
+    /// status. Read as an escape, it swallowed everything after it.
+    func testReadsBackslashesTheWayTheFilesSQLModeSays() async throws {
+        let viewModel = try await restore(Data(#"""
+            /*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
+            CREATE TABLE t (id INT PRIMARY KEY, path VARCHAR(20));
+            INSERT INTO t VALUES (1,'C:\\dir');
+            /*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
+            /*!50003 SET sql_mode              = 'NO_BACKSLASH_ESCAPES' */ ;
+            DELIMITER ;;
+            CREATE FUNCTION `to_slashes`(p TEXT) RETURNS text
+                DETERMINISTIC
+            RETURN REPLACE(p, '\', '/') ;;
+            DELIMITER ;
+            /*!50003 SET sql_mode              = @saved_sql_mode */ ;
+            SET @OLDTMP_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_BACKSLASH_ESCAPES';
+            DELIMITER //
+            CREATE FUNCTION `win_dir`() RETURNS varchar(5) DETERMINISTIC RETURN 'C:\'//
+            DELIMITER ;
+            SET SQL_MODE=@OLDTMP_SQL_MODE;
+            SET @saved_sql_mode = @@SQL_MODE, SQL_MODE = 'NO_BACKSLASH_ESCAPES';
+            SET @saved_collation_connection = @@COLLATION_CONNECTION, COLLATION_CONNECTION = 'utf8mb4_general_ci';
+            DELIMITER $$
+
+            CREATE PROCEDURE `p_nbe`() BEGIN SELECT 'C:\'; END$$
+
+            DELIMITER ;
+            SET SQL_MODE = @saved_sql_mode, COLLATION_CONNECTION = @saved_collation_connection;
+            INSERT INTO t VALUES (2,'it\'s');
+            /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
+            """#.utf8)) { $0.readChunkSize = 7 }
+
+        XCTAssertNil(viewModel.errorMessage)
+        XCTAssertEqual(viewModel.statementErrors, [])
+        let routines = try await service.query("""
+            SELECT ROUTINE_NAME AS name FROM information_schema.ROUTINES WHERE ROUTINE_SCHEMA = '\(database)' AND SQL_MODE = 'NO_BACKSLASH_ESCAPES' ORDER BY 1
+            """).compactMap { $0.column("name")?.string }
+        XCTAssertEqual(routines, ["p_nbe", "to_slashes", "win_dir"])
+        let results = try await service.query("SELECT `\(database)`.to_slashes(CONCAT('a', CHAR(92), 'b')) AS s, `\(database)`.win_dir() AS w").first
+        XCTAssertEqual(results?.column("s")?.string, "a/b")
+        XCTAssertEqual(results?.column("w")?.string, #"C:\"#)
+        let paths = try await service.query("SELECT path FROM `\(database)`.t ORDER BY id").compactMap { $0.column("path")?.string }
+        XCTAssertEqual(paths, [#"C:\dir"#, "it's"])
+    }
+
     /// Restoring into a chosen database, the file can't switch away from
     /// it, create or drop the database it was made from.
     func testSkipsTheFilesOwnDatabaseStatementsWhenRestoringIntoAnother() async throws {

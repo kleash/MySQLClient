@@ -296,4 +296,22 @@ final class DelimiterScriptTests: XCTestCase {
             XCTAssertEqual(decoded, expected, "chunk size \(chunkSize)")
         }
     }
+
+    /// A server in NO_BACKSLASH_ESCAPES mode reads a backslash in a string
+    /// as itself, so `'C:\'` is a whole string there. Only the server knows
+    /// its mode once a statement has changed it, so the splitter stops after
+    /// any statement that mentions sql_mode and reads the rest the way the
+    /// caller then says the server does.
+    func testSplitterReadsBackslashesInTheModeTheCallerSets() {
+        func sql(_ found: [(sql: [UInt8], line: Int)]) -> [String] {
+            found.map { String(decoding: $0.sql, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines) }
+        }
+        let script = "SET sql_mode = 'NO_BACKSLASH_ESCAPES';\nSELECT 'C:\\'; SELECT 2;\n/*!50003 SET SQL_MODE = '' */;\nSELECT 'it\\'s; one'; SELECT 3;\n"
+        var splitter = DelimiterScript.Splitter()
+        XCTAssertEqual(sql(splitter.feed(script.utf8)), ["SET sql_mode = 'NO_BACKSLASH_ESCAPES'"])
+        splitter.noBackslashEscapes = true
+        XCTAssertEqual(sql(splitter.feed(Data())), [#"SELECT 'C:\'"#, "SELECT 2", "/*!50003 SET SQL_MODE = '' */"])
+        splitter.noBackslashEscapes = false
+        XCTAssertEqual(sql(splitter.finish()), [#"SELECT 'it\'s; one'"#, "SELECT 3"])
+    }
 }

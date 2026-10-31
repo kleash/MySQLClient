@@ -101,6 +101,12 @@ enum DelimiterScript {
         var isAtLineStart = true
         /// Line breaks before this point.
         var line = 0
+        /// The server's sql_mode has NO_BACKSLASH_ESCAPES: a backslash in a
+        /// string is then an ordinary character, so `'C:\'` is a whole
+        /// string. The mysql client follows the server's status flag for
+        /// this; only the caller, which talks to the server, can keep it
+        /// up to date.
+        var noBackslashEscapes = false
     }
 
     /// The scanner behind `locatedStatements(from:)`, over raw bytes, and
@@ -117,10 +123,15 @@ enum DelimiterScript {
     ///
     /// Each statement comes back as its byte range in `bytes`, untrimmed,
     /// with the line it starts on; decoding is left to the caller.
+    ///
+    /// With `stopsAfterSQLMode`, the scan also stops right after a statement
+    /// that mentions sql_mode, as if the bytes ended there: running it may
+    /// change `noBackslashEscapes` for the rest.
     static func scan(
         _ bytes: [UInt8],
         from state: ScanState = ScanState(),
-        isFinal: Bool
+        isFinal: Bool,
+        stopsAfterSQLMode: Bool = false
     ) -> (statements: [(range: Range<Int>, line: Int)], consumed: Int, state: ScanState) {
         let count = bytes.count
         var statements: [(range: Range<Int>, line: Int)] = []
@@ -137,11 +148,18 @@ enum DelimiterScript {
         // The last point where a statement had just ended: where a scan
         // that stops early can be picked up again.
         var boundary = (offset: 0, state: state)
+        var stopped = false
 
         func endStatement(at end: Int) {
             guard let start = statementStart else { return }
             statementStart = nil
             statements.append((start.offset..<end, start.line))
+            stopped = stopsAfterSQLMode && mentionsSQLMode(bytes[start.offset..<end])
+        }
+
+        // The state to carry on from here, between statements.
+        func stateHere(isAtLineStart: Bool = false) -> ScanState {
+            ScanState(delimiter: delimiter, isAtLineStart: isAtLineStart, line: line, noBackslashEscapes: state.noBackslashEscapes)
         }
 
         func byte(at offset: Int) -> UInt8? {
@@ -158,7 +176,8 @@ enum DelimiterScript {
                     endStatement(at: index)
                     delimiter = directive.delimiter
                     index = directive.lineEnd
-                    boundary = (index, ScanState(delimiter: delimiter, isAtLineStart: false, line: line))
+                    boundary = (index, stateHere())
+                    if stopped { break scanning }
                     continue
                 }
             }
@@ -167,7 +186,8 @@ enum DelimiterScript {
             if current == delimiter[0], bytes[index...].starts(with: delimiter) {
                 endStatement(at: index)
                 index += delimiter.count
-                boundary = (index, ScanState(delimiter: delimiter, isAtLineStart: false, line: line))
+                boundary = (index, stateHere())
+                if stopped { break scanning }
                 continue
             }
 
@@ -185,7 +205,7 @@ enum DelimiterScript {
                 let quote = current
                 index += 1
                 while index < count, bytes[index] != quote {
-                    let isEscape = bytes[index] == UInt8(ascii: "\\") && quote != UInt8(ascii: "`")
+                    let isEscape = bytes[index] == UInt8(ascii: "\\") && quote != UInt8(ascii: "`") && !state.noBackslashEscapes
                     for skipped in index..<min(index + (isEscape ? 2 : 1), count) where bytes[skipped] == UInt8(ascii: "\n") {
                         line += 1
                     }
@@ -222,11 +242,21 @@ enum DelimiterScript {
             }
         }
 
-        guard isFinal else {
+        guard isFinal, !stopped else {
             return (statements, boundary.offset, boundary.state)
         }
         endStatement(at: count)
-        return (statements, count, ScanState(delimiter: delimiter, isAtLineStart: isAtLineStart, line: line))
+        return (statements, count, stateHere(isAtLineStart: isAtLineStart))
+    }
+
+    /// Whether a statement mentions sql_mode, so may change how the server
+    /// reads a backslash in the strings after it (`noBackslashEscapes`).
+    static func mentionsSQLMode(_ statement: ArraySlice<UInt8>) -> Bool {
+        let name = Array("sql_mode".utf8)
+        // `| 0x20` lowercases an ASCII letter; `_` changes alike on both sides.
+        return statement.indices.dropLast(name.count - 1).contains { start in
+            statement[start] | 0x20 == name[0] && zip(statement[start...], name).allSatisfy { $0 | 0x20 == $1 | 0x20 }
+        }
     }
 
     /// Splits a script handed over a piece at a time — a file read in
@@ -239,9 +269,18 @@ enum DelimiterScript {
     /// from its start with each chunk, so a caller reading a file should
     /// grow its reads while no statement ends (`DatabaseRestoreViewModel`
     /// doubles them).
+    ///
+    /// It hands over nothing past a statement that mentions sql_mode: the
+    /// caller runs it, sets `noBackslashEscapes` from the server, and asks
+    /// for the rest with `feed` of no bytes (or `finish`).
     struct Splitter {
         private var pending: [UInt8] = []
         private var state = ScanState()
+
+        var noBackslashEscapes: Bool {
+            get { state.noBackslashEscapes }
+            set { state.noBackslashEscapes = newValue }
+        }
 
         /// The statements `bytes` completes.
         mutating func feed(_ bytes: some Sequence<UInt8>) -> [(sql: [UInt8], line: Int)] {
@@ -255,7 +294,7 @@ enum DelimiterScript {
         }
 
         private mutating func take(isFinal: Bool) -> [(sql: [UInt8], line: Int)] {
-            let result = DelimiterScript.scan(pending, from: state, isFinal: isFinal)
+            let result = DelimiterScript.scan(pending, from: state, isFinal: isFinal, stopsAfterSQLMode: true)
             let statements = result.statements.map { (sql: Array(pending[$0.range]), line: $0.line) }
             pending.removeFirst(result.consumed)
             state = result.state
