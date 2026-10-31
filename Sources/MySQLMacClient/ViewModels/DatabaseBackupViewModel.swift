@@ -602,7 +602,7 @@ final class DatabaseBackupViewModel: ObservableObject {
             header += "SET FOREIGN_KEY_CHECKS=0;\n"
         }
         header += "\n"
-        fileHandle.write(Data(header.utf8))
+        try fileHandle.write(contentsOf: Data(header.utf8))
     }
 
     private func writeFooter(to fileHandle: FileHandle) async throws {
@@ -611,7 +611,7 @@ final class DatabaseBackupViewModel: ObservableObject {
             footer += "SET FOREIGN_KEY_CHECKS=1;\n"
         }
         footer += "SET SQL_MODE = @OLD_SQL_MODE;\nSET TIME_ZONE = @OLD_TIME_ZONE;\n"
-        fileHandle.write(Data(footer.utf8))
+        try fileHandle.write(contentsOf: Data(footer.utf8))
     }
 
     // MARK: - Per-object dump
@@ -638,11 +638,11 @@ final class DatabaseBackupViewModel: ObservableObject {
     private func dumpTable(_ table: TableInfo, to fileHandle: FileHandle) async throws {
         if options.mode != .dataOnly {
             if options.file.includeDropStatements {
-                fileHandle.write(Data((SQLExporter.dropTableStatement(table: table.name) + "\n").utf8))
+                try fileHandle.write(contentsOf: Data((SQLExporter.dropTableStatement(table: table.name) + "\n").utf8))
             }
             let rawDDL = try await introspection.showCreateTable(table.name, inDatabase: database.name)
             let createSQL = SQLExporter.createTableStatement(rawShowCreateTable: rawDDL)
-            fileHandle.write(Data((createSQL + "\n\n").utf8))
+            try fileHandle.write(contentsOf: Data((createSQL + "\n\n").utf8))
         }
         // A sequence's definition (where it starts, its increment, cache)
         // is in its one row, as well as where it has got to: SHOW CREATE
@@ -845,15 +845,15 @@ final class DatabaseBackupViewModel: ObservableObject {
         for view in selectedViews.sorted(by: { $0.name < $1.name }) {
             let columns = try await introspection.columns(forTable: view.name, inDatabase: database.name)
             let selectList = columns.map { "1 AS \(SQLExporter.quoted($0.name))" }.joined(separator: ", ")
-            fileHandle.write(Data("CREATE OR REPLACE VIEW \(SQLExporter.quoted(view.name)) AS SELECT \(selectList);\n".utf8))
+            try fileHandle.write(contentsOf: Data("CREATE OR REPLACE VIEW \(SQLExporter.quoted(view.name)) AS SELECT \(selectList);\n".utf8))
         }
-        fileHandle.write(Data("\n".utf8))
+        try fileHandle.write(contentsOf: Data("\n".utf8))
     }
 
     private func dumpView(_ view: TableInfo, to fileHandle: FileHandle) async throws {
         guard options.mode != .dataOnly else { return }
         if options.file.includeDropStatements {
-            fileHandle.write(Data((SQLExporter.dropViewStatement(view: view.name) + "\n").utf8))
+            try fileHandle.write(contentsOf: Data((SQLExporter.dropViewStatement(view: view.name) + "\n").utf8))
         }
         let definition = try await introspection.viewDefinition(view.name, inDatabase: database.name)
         let createSQL = SQLExporter.createViewStatement(rawShowCreateView: definition.statement)
@@ -862,7 +862,7 @@ final class DatabaseBackupViewModel: ObservableObject {
         // it). Not the character set its text came in, since the file's is
         // UTF-8 whatever that was.
         let collation = SQLExporter.escapeStringLiteral(definition.collationConnection)
-        fileHandle.write(Data((
+        try fileHandle.write(contentsOf: Data((
             "SET @saved_collation_connection = @@COLLATION_CONNECTION, COLLATION_CONNECTION = '\(collation)';\n"
                 + createSQL + "\nSET COLLATION_CONNECTION = @saved_collation_connection;\n\n"
         ).utf8))
@@ -871,28 +871,28 @@ final class DatabaseBackupViewModel: ObservableObject {
     private func dumpRoutine(_ routine: RoutineInfo, to fileHandle: FileHandle) async throws {
         guard options.mode != .dataOnly else { return }
         if options.file.includeDropStatements {
-            fileHandle.write(Data((SQLExporter.dropRoutineStatement(routine) + "\n").utf8))
+            try fileHandle.write(contentsOf: Data((SQLExporter.dropRoutineStatement(routine) + "\n").utf8))
         }
         let definition = try await introspection.routineDefinition(routine)
-        fileHandle.write(Data((creationStatement(definition) + "\n\n").utf8))
+        try fileHandle.write(contentsOf: Data((creationStatement(definition) + "\n\n").utf8))
     }
 
     private func dumpTrigger(_ trigger: TriggerInfo, to fileHandle: FileHandle) async throws {
         guard options.mode != .dataOnly else { return }
         if options.file.includeDropStatements {
-            fileHandle.write(Data((SQLExporter.dropTriggerStatement(trigger) + "\n").utf8))
+            try fileHandle.write(contentsOf: Data((SQLExporter.dropTriggerStatement(trigger) + "\n").utf8))
         }
         let definition = try await introspection.triggerDefinition(trigger)
-        fileHandle.write(Data((creationStatement(definition) + "\n\n").utf8))
+        try fileHandle.write(contentsOf: Data((creationStatement(definition) + "\n\n").utf8))
     }
 
     private func dumpEvent(_ event: EventInfo, to fileHandle: FileHandle) async throws {
         guard options.mode != .dataOnly else { return }
         if options.file.includeDropStatements {
-            fileHandle.write(Data((SQLExporter.dropEventStatement(event) + "\n").utf8))
+            try fileHandle.write(contentsOf: Data((SQLExporter.dropEventStatement(event) + "\n").utf8))
         }
         let definition = try await introspection.eventDefinition(event)
-        fileHandle.write(Data((creationStatement(definition) + "\n\n").utf8))
+        try fileHandle.write(contentsOf: Data((creationStatement(definition) + "\n\n").utf8))
     }
 
     /// A routine, trigger or event's CREATE under the settings it was
