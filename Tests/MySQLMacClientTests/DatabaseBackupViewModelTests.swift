@@ -16,6 +16,8 @@ import XCTest
 final class DatabaseBackupViewModelTests: XCTestCase {
     var service: MySQLService!
     var tempFileURL: URL!
+    /// Made by `makeScratchDatabase`, dropped in tearDown.
+    private var scratchDatabases: [String] = []
 
     override func setUp() async throws {
         // Assigned before any throwing call — see TableExportViewModelTests
@@ -46,11 +48,33 @@ final class DatabaseBackupViewModelTests: XCTestCase {
         // catalog unavailable) or already dropped.
         _ = try? await service.rawQuery("DROP PROCEDURE IF EXISTS backup_test_proc")
         _ = try? await service.rawQuery("DROP FUNCTION IF EXISTS backup_test_fn")
+        for name in scratchDatabases {
+            _ = try? await service.rawQuery("DROP DATABASE IF EXISTS `\(name)`")
+        }
         try await service.disconnect()
     }
 
     private func makeViewModel() -> DatabaseBackupViewModel {
         DatabaseBackupViewModel(service: service, database: DatabaseInfo(name: "mysqlmacclient_test"))
+    }
+
+    /// A database of the test's own, with `statements` run in it.
+    private func makeScratchDatabase(_ name: String, _ statements: [String]) async throws -> DatabaseInfo {
+        scratchDatabases.append(name)
+        _ = try await service.rawQuery("DROP DATABASE IF EXISTS `\(name)`")
+        _ = try await service.rawQuery("CREATE DATABASE `\(name)`")
+        _ = try await service.rawQuery("USE `\(name)`")
+        for statement in statements {
+            _ = try await service.rawQuery(statement)
+        }
+        _ = try await service.rawQuery("USE mysqlmacclient_test")
+        return DatabaseInfo(name: name)
+    }
+
+    private func connectAnother() async throws -> MySQLService {
+        let other = MySQLService()
+        try await other.connect(host: TestDatabase.host, port: TestDatabase.port, username: TestDatabase.username, password: TestDatabase.password, database: nil)
+        return other
     }
 
     /// `throws` so callers can `try await` it directly before the rest of
@@ -548,10 +572,68 @@ final class DatabaseBackupViewModelTests: XCTestCase {
     }
 
     private func kill(_ connectionID: Int) async throws {
-        let killer = MySQLService()
-        try await killer.connect(host: TestDatabase.host, port: TestDatabase.port, username: TestDatabase.username, password: TestDatabase.password, database: nil)
+        let killer = try await connectAnother()
         try await killer.execute("KILL \(connectionID)")
         try await killer.disconnect()
+    }
+
+    /// A row committed after the backup began isn't in it, even with the
+    /// app's connection at READ COMMITTED, where the server ignores WITH
+    /// CONSISTENT SNAPSHOT and every read sees the latest commit.
+    func testBackupReadsOneSnapshotWhateverTheAppsIsolationLevel() async throws {
+        try await service.execute("DELETE FROM widget_logs_nopk")
+        _ = try await service.rawQuery("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED")
+        let viewModel = makeViewModel()
+        await viewModel.loadDatabasesAndObjects()
+        viewModel.outputFileURL = tempFileURL
+        viewModel.outputLocationIsGranted = true
+        viewModel.interObjectDelay = .milliseconds(200)
+
+        viewModel.startBackup()
+        // The first table is read, so the snapshot is taken; widget_logs_nopk
+        // is read later.
+        while (viewModel.progress?.completedObjects ?? 0) < 1 { await Task.yield() }
+        let writer = try await connectAnother()
+        try await writer.execute("INSERT INTO mysqlmacclient_test.widget_logs_nopk (message) VALUES ('after the snapshot')")
+        try await writer.disconnect()
+        while viewModel.isRunning { await Task.yield() }
+        try await service.execute("DELETE FROM widget_logs_nopk")
+
+        XCTAssertNil(viewModel.errorMessage)
+        XCTAssertFalse(try String(contentsOf: tempFileURL, encoding: .utf8).contains("after the snapshot"))
+    }
+
+    /// Once read, a table is free for DDL again although the backup's
+    /// transaction goes on: otherwise an ALTER of it waits for the whole
+    /// backup, and every other query on the table queues behind the ALTER.
+    func testBackupLetsGoOfEachTableOnceItIsRead() async throws {
+        let scratch = try await makeScratchDatabase("mysqlmacclient_backup_mdl", [
+            "CREATE TABLE a (id INT PRIMARY KEY) ENGINE=InnoDB",
+            "CREATE TABLE b (id INT PRIMARY KEY) ENGINE=InnoDB",
+            "INSERT INTO a VALUES (1)",
+        ])
+        let viewModel = DatabaseBackupViewModel(service: service, database: scratch)
+        await viewModel.loadDatabasesAndObjects()
+        viewModel.outputFileURL = tempFileURL
+        viewModel.outputLocationIsGranted = true
+        viewModel.interObjectDelay = .seconds(2)
+
+        viewModel.startBackup()
+        // `a` is read; the backup is on `b` and then pauses.
+        while (viewModel.progress?.completedObjects ?? 0) < 1 { await Task.yield() }
+        let other = try await connectAnother()
+        _ = try await other.rawQuery("SET SESSION lock_wait_timeout = 1")
+        var alterError: Error?
+        do {
+            _ = try await other.rawQuery("ALTER TABLE mysqlmacclient_backup_mdl.a COMMENT = 'altered during the backup'")
+        } catch {
+            alterError = error
+        }
+        try await other.disconnect()
+        while viewModel.isRunning { await Task.yield() }
+
+        XCTAssertNil(alterError)
+        XCTAssertNil(viewModel.errorMessage)
     }
 
     func testRunBackupToUnwritablePathSetsErrorMessageInsteadOfCrashing() async throws {

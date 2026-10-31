@@ -393,6 +393,14 @@ final class DatabaseBackupViewModel: ObservableObject {
                         currentObjectDescription: object.description
                     )
                     try await self.dump(object, to: fileHandle)
+                    if self.options.source.useSingleTransaction {
+                        // Lets go of the metadata locks reading the object
+                        // took, as mysqldump does after each table: otherwise
+                        // DDL on it waits for the whole backup, and every
+                        // other query on it waits behind that DDL. The
+                        // snapshot stays.
+                        _ = try await self.service.textQuery("ROLLBACK TO SAVEPOINT sp")
+                    }
                     self.unitsBeforeCurrentObject += weights[index]
                     if self.interObjectDelay != .zero {
                         try await Task.sleep(for: self.interObjectDelay)
@@ -478,17 +486,25 @@ final class DatabaseBackupViewModel: ObservableObject {
     // MARK: - Source session (LOCK TABLES / START TRANSACTION)
 
     /// Over the text protocol (`textQuery`), one round trip each: MariaDB
-    /// refuses `LOCK TABLES` and `START TRANSACTION` as prepared statements,
-    /// which `rawQuery` would try first. Nothing here is undone at the end:
-    /// closing the backup's connection (`performBackup`) ends the
-    /// transaction and releases the locks.
+    /// refuses `LOCK TABLES`, `START TRANSACTION` and `SAVEPOINT` as
+    /// prepared statements, which `rawQuery` would try first. Nothing here
+    /// is undone at the end: closing the backup's connection
+    /// (`performBackup`) ends the transaction and releases the locks.
+    ///
+    /// The snapshot is read at REPEATABLE READ, as mysqldump does: at READ
+    /// COMMITTED, which some servers are set to, the server ignores WITH
+    /// CONSISTENT SNAPSHOT with only a warning, and every read sees the
+    /// latest commit. `performBackup` rolls back to the savepoint after each
+    /// object.
     private func beginSourceSession() async throws {
         if options.source.lockTablesForReading, !selectedTables.isEmpty {
             let lockList = selectedTables.sorted { $0.name < $1.name }.map { "\(SQLExporter.quoted($0.name)) READ" }.joined(separator: ", ")
             _ = try await service.textQuery("LOCK TABLES \(lockList)")
         }
         if options.source.useSingleTransaction {
+            _ = try await service.textQuery("SET SESSION TRANSACTION ISOLATION LEVEL REPEATABLE READ")
             _ = try await service.textQuery("START TRANSACTION WITH CONSISTENT SNAPSHOT")
+            _ = try await service.textQuery("SAVEPOINT sp")
         }
     }
 
