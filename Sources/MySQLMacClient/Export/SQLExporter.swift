@@ -157,6 +157,14 @@ enum SQLExporter {
         "DROP \(routine.kind.sqlKeyword) IF EXISTS \(quoted(routine.database)).\(quoted(routine.name));"
     }
 
+    static func dropTriggerStatement(_ trigger: TriggerInfo) -> String {
+        "DROP TRIGGER IF EXISTS \(quoted(trigger.database)).\(quoted(trigger.name));"
+    }
+
+    static func dropEventStatement(_ event: EventInfo) -> String {
+        "DROP EVENT IF EXISTS \(quoted(event.database)).\(quoted(event.name));"
+    }
+
     /// Wraps a routine's raw `SHOW CREATE <kind>` output (from
     /// `SchemaIntrospectionService.showCreateRoutine`) in the same
     /// `DELIMITER $$ ... $$ DELIMITER ;` shape `SQLTemplate
@@ -172,13 +180,16 @@ enum SQLExporter {
     /// `statement` run under the SQL mode and connection collation an object
     /// was created under, as mysqldump does, so the restored routine,
     /// trigger or event keeps them; the session's own are put back after.
+    /// An event also gets the time zone its schedule was written in.
     static func underCreationSettings(_ statement: String, _ settings: SchemaIntrospectionService.CreationSettings) -> String {
-        """
-        SET @saved_sql_mode = @@SQL_MODE, SQL_MODE = '\(escapeStringLiteral(settings.sqlMode))';
-        SET @saved_collation_connection = @@COLLATION_CONNECTION, COLLATION_CONNECTION = '\(escapeStringLiteral(settings.collationConnection))';
-        \(statement)
-        SET SQL_MODE = @saved_sql_mode, COLLATION_CONNECTION = @saved_collation_connection;
-        """
+        var set = "SET @saved_sql_mode = @@SQL_MODE, SQL_MODE = '\(escapeStringLiteral(settings.sqlMode))';\n"
+            + "SET @saved_collation_connection = @@COLLATION_CONNECTION, COLLATION_CONNECTION = '\(escapeStringLiteral(settings.collationConnection))';\n"
+        var reset = "SET SQL_MODE = @saved_sql_mode, COLLATION_CONNECTION = @saved_collation_connection;"
+        if let timeZone = settings.timeZone {
+            set += "SET @saved_time_zone = @@TIME_ZONE, TIME_ZONE = '\(escapeStringLiteral(timeZone))';\n"
+            reset += "\nSET TIME_ZONE = @saved_time_zone;"
+        }
+        return set + statement + "\n" + reset
     }
 
     /// mysqldump's `--extended-insert`: batches rows into as few multi-row

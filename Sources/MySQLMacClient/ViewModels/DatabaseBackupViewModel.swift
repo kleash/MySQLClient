@@ -35,6 +35,8 @@ final class DatabaseBackupViewModel: ObservableObject {
         case view(TableInfo)
         case procedure(RoutineInfo)
         case function(RoutineInfo)
+        case trigger(TriggerInfo)
+        case event(EventInfo)
 
         var description: String {
             switch self {
@@ -42,6 +44,8 @@ final class DatabaseBackupViewModel: ObservableObject {
             case .view(let view): return String(localized: "View: \(view.name)")
             case .procedure(let routine): return String(localized: "Procedure: \(routine.name)")
             case .function(let routine): return String(localized: "Function: \(routine.name)")
+            case .trigger(let trigger): return String(localized: "Trigger: \(trigger.name)")
+            case .event(let event): return String(localized: "Event: \(event.name)")
             }
         }
     }
@@ -53,11 +57,17 @@ final class DatabaseBackupViewModel: ObservableObject {
     @Published private(set) var allViews: [TableInfo] = []
     @Published private(set) var allProcedures: [RoutineInfo] = []
     @Published private(set) var allFunctions: [RoutineInfo] = []
+    /// In the order `SHOW TRIGGERS` lists them, which for the triggers of
+    /// one table and event is the order they fire in.
+    @Published private(set) var allTriggers: [TriggerInfo] = []
+    @Published private(set) var allEvents: [EventInfo] = []
 
     @Published var selectedTables: Set<TableInfo> = []
     @Published var selectedViews: Set<TableInfo> = []
     @Published var selectedProcedures: Set<RoutineInfo> = []
     @Published var selectedFunctions: Set<RoutineInfo> = []
+    @Published var selectedTriggers: Set<TriggerInfo> = []
+    @Published var selectedEvents: Set<EventInfo> = []
 
     /// `LOCK TABLES` causes an implicit `COMMIT` in MySQL, which would
     /// silently end a `START TRANSACTION WITH CONSISTENT SNAPSHOT` running
@@ -124,6 +134,7 @@ final class DatabaseBackupViewModel: ObservableObject {
 
     var selectedObjectCount: Int {
         selectedTables.count + selectedViews.count + selectedProcedures.count + selectedFunctions.count
+            + selectedTriggers.count + selectedEvents.count
     }
 
     private let service: MySQLService
@@ -209,6 +220,22 @@ final class DatabaseBackupViewModel: ObservableObject {
             selectedFunctions = []
             loadWarning = String(localized: "Could not load the procedure/function list; tables and views were loaded: \(describe(error))")
         }
+
+        // Same reasoning, separately: listing events takes the EVENT
+        // privilege, which a user who can read everything else may lack.
+        do {
+            allTriggers = try await introspection.listTriggers(inDatabase: database.name)
+            allEvents = try await introspection.listEvents(inDatabase: database.name)
+            selectedTriggers = Set(allTriggers)
+            selectedEvents = Set(allEvents)
+        } catch {
+            allTriggers = []
+            allEvents = []
+            selectedTriggers = []
+            selectedEvents = []
+            let warning = String(localized: "Could not load the trigger/event list; the other objects were loaded: \(describe(error))")
+            loadWarning = [loadWarning, warning].compactMap { $0 }.joined(separator: "\n")
+        }
     }
 
     func selectAllObjects() {
@@ -216,6 +243,8 @@ final class DatabaseBackupViewModel: ObservableObject {
         selectedViews = Set(allViews)
         selectedProcedures = Set(allProcedures)
         selectedFunctions = Set(allFunctions)
+        selectedTriggers = Set(allTriggers)
+        selectedEvents = Set(allEvents)
     }
 
     func selectNoObjects() {
@@ -223,6 +252,8 @@ final class DatabaseBackupViewModel: ObservableObject {
         selectedViews = []
         selectedProcedures = []
         selectedFunctions = []
+        selectedTriggers = []
+        selectedEvents = []
     }
 
     private func defaultOutputURL() -> URL {
@@ -360,14 +391,19 @@ final class DatabaseBackupViewModel: ObservableObject {
     /// and is safe because `FOREIGN_KEY_CHECKS=0` is on by default,
     /// matching real `mysqldump`'s own behavior). Views after all tables —
     /// `CREATE VIEW` genuinely requires its underlying tables to exist,
-    /// unlike a constraint that's just disabled by a flag. Routines last.
-    /// Alphabetical within each category, since a `Set` has no defined
-    /// order and dump output needs to be deterministic across runs.
+    /// unlike a constraint that's just disabled by a flag. Then routines,
+    /// then triggers — after every table's rows, as mysqldump does, so
+    /// restoring the rows doesn't fire them (an audit trigger would write
+    /// its rows a second time) — in the order they fire, and events last.
+    /// Alphabetical otherwise, since a `Set` has no defined order and dump
+    /// output needs to be deterministic across runs.
     private func buildObjectPlan() -> [BackupObject] {
         selectedTables.sorted { $0.name < $1.name }.map { .table($0) }
             + selectedViews.sorted { $0.name < $1.name }.map { .view($0) }
             + selectedProcedures.sorted { $0.name < $1.name }.map { .procedure($0) }
             + selectedFunctions.sorted { $0.name < $1.name }.map { .function($0) }
+            + allTriggers.filter(selectedTriggers.contains).map { .trigger($0) }
+            + selectedEvents.sorted { $0.name < $1.name }.map { .event($0) }
     }
 
     /// How much work each planned object represents, so the percentage
@@ -497,6 +533,10 @@ final class DatabaseBackupViewModel: ObservableObject {
             try await dumpView(view, to: fileHandle)
         case .procedure(let routine), .function(let routine):
             try await dumpRoutine(routine, to: fileHandle)
+        case .trigger(let trigger):
+            try await dumpTrigger(trigger, to: fileHandle)
+        case .event(let event):
+            try await dumpEvent(event, to: fileHandle)
         }
     }
 
@@ -662,6 +702,26 @@ final class DatabaseBackupViewModel: ObservableObject {
             fileHandle.write(Data((SQLExporter.dropRoutineStatement(routine) + "\n").utf8))
         }
         let definition = try await introspection.routineDefinition(routine)
+        let wrapped = SQLExporter.delimiterWrappedRoutineStatement(rawShowCreateRoutine: definition.statement)
+        fileHandle.write(Data((SQLExporter.underCreationSettings(wrapped, definition.settings) + "\n\n").utf8))
+    }
+
+    private func dumpTrigger(_ trigger: TriggerInfo, to fileHandle: FileHandle) async throws {
+        guard options.mode != .dataOnly else { return }
+        if options.file.includeDropStatements {
+            fileHandle.write(Data((SQLExporter.dropTriggerStatement(trigger) + "\n").utf8))
+        }
+        let definition = try await introspection.triggerDefinition(trigger)
+        let wrapped = SQLExporter.delimiterWrappedRoutineStatement(rawShowCreateRoutine: definition.statement)
+        fileHandle.write(Data((SQLExporter.underCreationSettings(wrapped, definition.settings) + "\n\n").utf8))
+    }
+
+    private func dumpEvent(_ event: EventInfo, to fileHandle: FileHandle) async throws {
+        guard options.mode != .dataOnly else { return }
+        if options.file.includeDropStatements {
+            fileHandle.write(Data((SQLExporter.dropEventStatement(event) + "\n").utf8))
+        }
+        let definition = try await introspection.eventDefinition(event)
         let wrapped = SQLExporter.delimiterWrappedRoutineStatement(rawShowCreateRoutine: definition.statement)
         fileHandle.write(Data((SQLExporter.underCreationSettings(wrapped, definition.settings) + "\n\n").utf8))
     }

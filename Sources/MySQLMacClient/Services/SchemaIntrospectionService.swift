@@ -177,6 +177,8 @@ struct SchemaIntrospectionService {
     struct CreationSettings: Equatable {
         let sqlMode: String
         let collationConnection: String
+        /// Events only: the time zone their schedule is in.
+        var timeZone: String? = nil
     }
 
     /// `showCreateRoutine`, with the settings the routine was created under.
@@ -190,11 +192,13 @@ struct SchemaIntrospectionService {
     }
 
     /// The `sql_mode` and `collation_connection` columns every `SHOW CREATE
-    /// PROCEDURE/FUNCTION/TRIGGER/EVENT` row carries.
+    /// PROCEDURE/FUNCTION/TRIGGER/EVENT` row carries, and an event's
+    /// `time_zone`.
     static func creationSettings(of row: MySQLRow) -> CreationSettings {
         CreationSettings(
             sqlMode: row.column("sql_mode")?.string ?? "",
-            collationConnection: row.column("collation_connection")?.string ?? ""
+            collationConnection: row.column("collation_connection")?.string ?? "",
+            timeZone: row.column("time_zone")?.string
         )
     }
 
@@ -219,12 +223,17 @@ struct SchemaIntrospectionService {
     /// `SHOW CREATE TRIGGER` returns the definition in `SQL Original
     /// Statement` — a different column name than `showCreateRoutine`'s.
     func showCreateTrigger(_ trigger: TriggerInfo) async throws -> String {
+        try await triggerDefinition(trigger).statement
+    }
+
+    /// `showCreateTrigger`, with the settings the trigger was created under.
+    func triggerDefinition(_ trigger: TriggerInfo) async throws -> (statement: String, settings: CreationSettings) {
         let qualified = try Self.qualifiedIdentifier(database: trigger.database, name: trigger.name)
         let rows = try await service.query("SHOW CREATE TRIGGER \(qualified)")
-        guard let raw = rows.first?.column("SQL Original Statement")?.string else {
+        guard let row = rows.first, let raw = row.column("SQL Original Statement")?.string else {
             throw MySQLServiceError.invalidIdentifier(trigger.name)
         }
-        return raw
+        return (raw, Self.creationSettings(of: row))
     }
 
     /// `SHOW EVENTS FROM db` — same identifier-`FROM` shape as
@@ -240,12 +249,17 @@ struct SchemaIntrospectionService {
 
     /// `SHOW CREATE EVENT` returns the definition in `Create Event`.
     func showCreateEvent(_ event: EventInfo) async throws -> String {
+        try await eventDefinition(event).statement
+    }
+
+    /// `showCreateEvent`, with the settings the event was created under.
+    func eventDefinition(_ event: EventInfo) async throws -> (statement: String, settings: CreationSettings) {
         let qualified = try Self.qualifiedIdentifier(database: event.database, name: event.name)
         let rows = try await service.query("SHOW CREATE EVENT \(qualified)")
-        guard let raw = rows.first?.column("Create Event")?.string else {
+        guard let row = rows.first, let raw = row.column("Create Event")?.string else {
             throw MySQLServiceError.invalidIdentifier(event.name)
         }
-        return raw
+        return (raw, Self.creationSettings(of: row))
     }
 
     /// Every character set the server supports, for the "Yeni Tablo" form's

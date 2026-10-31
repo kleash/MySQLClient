@@ -308,5 +308,26 @@ final class BackupRoundTripTests: XCTestCase {
         END
         """,
         "CREATE FUNCTION doubled(p INT) RETURNS INT DETERMINISTIC RETURN p * 2",
+
+        // Triggers: two on one event, the second set to fire after the
+        // first although its name sorts before it, and one with a body.
+        // Restoring the rows must not fire them: audited holds a row whose
+        // note they would change.
+        "CREATE TABLE audited (id INT PRIMARY KEY, note VARCHAR(50))",
+        "INSERT INTO audited VALUES (1, 'kept as is')",
+        "CREATE TRIGGER z_first BEFORE INSERT ON audited FOR EACH ROW SET NEW.note = CONCAT(NEW.note, ';1')",
+        "CREATE TRIGGER a_second BEFORE INSERT ON audited FOR EACH ROW FOLLOWS z_first SET NEW.note = CONCAT(NEW.note, ';2')",
+        """
+        CREATE TRIGGER audited_update BEFORE UPDATE ON audited FOR EACH ROW
+        BEGIN
+            -- a comment with a ; in it
+            IF NEW.note IS NULL THEN SET NEW.note = 'was null; now set'; END IF;
+        END
+        """,
+
+        // An event, created in a time zone of its own.
+        "SET SESSION time_zone = '+03:00'",
+        "CREATE EVENT nightly ON SCHEDULE EVERY 1 DAY STARTS '2030-01-01 02:00:00' DISABLE DO DELETE FROM no_key WHERE v < 0",
+        "SET SESSION time_zone = DEFAULT",
     ]
 }

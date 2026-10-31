@@ -130,6 +130,12 @@ struct DatabaseBackupView: View {
                     categorySection(title: "Functions", items: viewModel.allFunctions, selection: Binding(
                         get: { viewModel.selectedFunctions }, set: { viewModel.selectedFunctions = $0 }
                     )) { $0.name }
+                    categorySection(title: "Triggers", items: viewModel.allTriggers, selection: Binding(
+                        get: { viewModel.selectedTriggers }, set: { viewModel.selectedTriggers = $0 }
+                    )) { $0.name }
+                    categorySection(title: "Events", items: viewModel.allEvents, selection: Binding(
+                        get: { viewModel.selectedEvents }, set: { viewModel.selectedEvents = $0 }
+                    )) { $0.name }
                 }
                 .padding(10)
             }
