@@ -509,4 +509,34 @@ final class DatabaseRestoreViewModelTests: XCTestCase {
         XCTAssertEqual(row?.column("b")?.string, "FFFE00C3")
         XCTAssertEqual(row?.column("txt")?.string, "6C696E650D0A627265616B")
     }
+
+    /// A trigger made under NO_BACKSLASH_ESCAPES ends a string with a
+    /// backslash ('\'), which the client, told the mode by the server, reads
+    /// as the whole string. Split as if the backslash escaped the quote, the
+    /// file hid the USE after it inside one long statement, which reached the
+    /// client as it was: the rest went into the database the file was made
+    /// from. The error at the end still names the file's line, although the
+    /// client was asked for the mode four times, on lines of their own.
+    func testMysqlClientReadsBackslashesTheWayItsSessionsSQLModeSays() async throws {
+        _ = try await service.rawQuery("CREATE DATABASE `\(other)`")
+        _ = try await service.rawQuery("CREATE TABLE `\(other)`.t (id INT PRIMARY KEY, path VARCHAR(20))")
+        let viewModel = try await restoreWithTheMysqlClient(Data(#"""
+            CREATE TABLE t (id INT PRIMARY KEY, path VARCHAR(20));
+            /*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
+            /*!50003 SET sql_mode              = 'NO_BACKSLASH_ESCAPES' */ ;
+            DELIMITER ;;
+            /*!50003 CREATE*/ /*!50017 DEFINER=CURRENT_USER*/ /*!50003 TRIGGER t_bi BEFORE INSERT ON t FOR EACH ROW SET NEW.path = REPLACE(NEW.path, '\', '/') */;;
+            DELIMITER ;
+            /*!50003 SET sql_mode              = @saved_sql_mode */ ;
+            USE `\#(other)`;
+            INSERT INTO t VALUES (1, 'it''s');
+            INSERT INTO t VALUES (1, 'again');
+            """#.utf8)) { $0.readChunkSize = 7 }
+
+        XCTAssertTrue(viewModel.errorMessage?.contains("at line 10: Duplicate entry") ?? false, viewModel.errorMessage ?? "nil")
+        let restored = try await ids(in: "t")
+        XCTAssertEqual(restored, [1])
+        let original = try await service.query("SELECT id FROM `\(other)`.t").compactMap { $0.column("id")?.int }
+        XCTAssertEqual(original, [], "the file's own database must be left alone")
+    }
 }

@@ -183,10 +183,12 @@ struct ExternalTool: Sendable {
     /// a raw line break inside a string into a different one, refuses a NUL
     /// byte, and runs the file's `system` lines as shell commands. Comments
     /// are kept (MariaDB's client drops them, also those inside a routine's
-    /// body), and a statement may be as big as the server takes.
+    /// body), and a statement may be as big as the server takes. What it
+    /// prints is written out after each statement, where
+    /// `DatabaseRestoreViewModel.pass` waits for the answers it asks for.
     func restoreArguments(database: String?, stopOnError: Bool, connection: Connection) throws -> [String] {
         var arguments = try connectionArguments(connection)
-        arguments += ["--binary-mode", "--comments", "--max-allowed-packet=1073741824"]
+        arguments += ["--binary-mode", "--comments", "--max-allowed-packet=1073741824", "--unbuffered"]
         if !stopOnError { arguments.append("--force") }
         if let database { arguments.append("--database=\(database)") }
         return arguments
@@ -214,10 +216,11 @@ struct ExternalTool: Sendable {
     /// once the tool has ended — also when it failed or was cancelled.
     /// Cancelling the task stops the tool.
     ///
-    /// `input` writes what the tool reads, on a thread of its own: a write
-    /// waits while the tool is busy, and fails once it has ended. The tool
-    /// writes to `output` (nowhere without), and each line it writes to
-    /// standard error goes to `onErrorLine` as it comes. Returns the lines
+    /// `input` writes what the tool reads, on a thread of its own started
+    /// once the tool is running: a write waits while the tool is busy, and
+    /// fails once it has ended. The tool writes to `output` (nowhere
+    /// without), and each line it writes to standard error goes to
+    /// `onErrorLine` as it comes. Returns the lines
     /// that aren't progress (`--verbose`'s start with "-- "); throws them
     /// in a `Failure` unless the tool ends with exit status 0, and else
     /// what `input` threw.
@@ -299,7 +302,7 @@ struct ExternalTool: Sendable {
     }
 
     /// A value two threads share.
-    private final class Locked<Value>: @unchecked Sendable {
+    final class Locked<Value>: @unchecked Sendable {
         private let lock = NSLock()
         private var stored: Value
         init(_ value: Value) { stored = value }

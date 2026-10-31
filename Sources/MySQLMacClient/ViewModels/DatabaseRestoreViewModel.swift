@@ -287,6 +287,7 @@ final class DatabaseRestoreViewModel: ObservableObject {
     /// run cut short. With `--force` it carries on past errors and still
     /// ends with exit status 0, so they're found in what it says.
     private func restoreWithExternalTool(from inputFileURL: URL) async {
+        let questionLines = ExternalTool.Locked<[Int]>([])
         do {
             let isMariaDB = await service.serverVersion?.contains("MariaDB") ?? false
             let tool = try await ExternalTool.find(.client, configuredPath: SettingsStore.shared.settings.general.clientToolPath,
@@ -299,14 +300,19 @@ final class DatabaseRestoreViewModel: ObservableObject {
             progress = Progress(bytesRead: 0, totalBytes: totalBytes, statementsRun: 0)
             let keepsDatabaseStatements = useDatabaseNamedInFile
             let chunkSize = readChunkSize
-            let messages = try await tool.run(arguments, optionFile: connection.optionFile) { input in
-                try Self.pass(inputFileURL, to: input, keepingDatabaseStatements: keepsDatabaseStatements, chunkSize: chunkSize) { sent in
+            let output = Pipe()
+            let messages = Self.fileLines(in: try await tool.run(arguments, optionFile: connection.optionFile, input: { input in
+                // The client has its own copy by now: without this one, what
+                // `pass` reads ends when the client does.
+                try? output.fileHandleForWriting.close()
+                try Self.pass(inputFileURL, to: input, output: output.fileHandleForReading, keepingDatabaseStatements: keepsDatabaseStatements,
+                              chunkSize: chunkSize, questionLines: questionLines) { sent in
                     Task { @MainActor in
                         guard self.isRunning else { return }
                         self.progress = Progress(bytesRead: sent.bytesRead, totalBytes: totalBytes, statementsRun: sent.statementsRun)
                     }
                 }
-            }
+            }, output: output.fileHandleForWriting), questionLines: questionLines.value)
             if messages.split(separator: "\n").contains(where: { $0.hasPrefix("ERROR ") }) {
                 errorMessage = String(localized: "\(tool.name) reported errors; it restored every other statement:\n\(messages)")
             } else {
@@ -316,8 +322,18 @@ final class DatabaseRestoreViewModel: ObservableObject {
         } catch is CancellationError {
             errorMessage = String(localized: "Stopped. What the client had already run stays restored.")
         } catch {
-            errorMessage = describe(error)
+            errorMessage = Self.fileLines(in: describe(error), questionLines: questionLines.value)
             AnalyticsService.trackError(error, feature: "db_restore")
+        }
+    }
+
+    /// The client's messages with the line each error names given as the
+    /// file's: every question `pass` asked took two lines, after the line
+    /// `questionLines` holds.
+    nonisolated static func fileLines(in messages: String, questionLines: [Int]) -> String {
+        messages.replacing(/(?m)^(ERROR \d+ \(\w+\) at line )(\d+)/) { match in
+            let line = Int(match.output.2) ?? 0
+            return "\(match.output.1)\(line - 2 * questionLines.count { $0 < line })"
         }
     }
 
@@ -329,19 +345,73 @@ final class DatabaseRestoreViewModel: ObservableObject {
     /// without the name, with as many line breaks as before, so the
     /// client's "at line N" is still the file's line N. `progress` gets the
     /// bytes read and statements sent, every megabyte and at the end.
-    nonisolated static func pass(_ fileURL: URL, to input: FileHandle, keepingDatabaseStatements: Bool, chunkSize: Int,
-                                 progress: (Progress) -> Void) throws {
+    ///
+    /// The file is split the way the client's session reads backslashes,
+    /// as `performRestore` splits it: the client is asked when it starts and
+    /// after each statement that mentions sql_mode, by a SELECT whose answer
+    /// comes back on `output`, its standard output. Split the other way, a
+    /// string that a routine made under NO_BACKSLASH_ESCAPES ends with a
+    /// backslash ('C:\') hid the statements after it, a USE among them,
+    /// which the client then ran. The client runs a line only once it has
+    /// all of it, so each question takes two lines of its own, after the
+    /// line `questionLines` gets, as the client numbers it (`fileLines`).
+    nonisolated static func pass(_ fileURL: URL, to input: FileHandle, output: FileHandle, keepingDatabaseStatements: Bool,
+                                 chunkSize: Int, questionLines: ExternalTool.Locked<[Int]>, progress: (Progress) -> Void) throws {
         let file = try FileHandle(forReadingFrom: fileURL)
         defer { try? file.close() }
+        // Everything the client prints is read as it comes, so what the
+        // file's own SELECTs print can't fill the pipe and stop it; only the
+        // answers are kept.
+        let marker = UUID().uuidString
+        let answer = ExternalTool.Locked<Bool?>(nil)
+        let answered = DispatchSemaphore(value: 0)
+        Thread.detachNewThread {
+            var unfinished = Data()
+            // What has come so far (`read(upToCount:)` would wait for all of
+            // the count), and nothing once the client has ended.
+            var data = output.availableData
+            while !data.isEmpty {
+                unfinished.append(data)
+                while let end = unfinished.firstIndex(of: UInt8(ascii: "\n")) {
+                    let line = unfinished[unfinished.startIndex..<end]
+                    unfinished = unfinished[(end + 1)...]
+                    if line.starts(with: marker.utf8) {
+                        answer.value = line.last == UInt8(ascii: "1")
+                        answered.signal()
+                    }
+                }
+                data = output.availableData
+            }
+            answered.signal()  // The client has ended, and won't answer.
+        }
+        func noBackslashEscapes(after state: DelimiterScript.ScanState) throws -> Bool {
+            questionLines.value.append(state.line + 1 + 2 * questionLines.value.count)
+            answer.value = nil
+            let question = "\nSELECT CONCAT('\(marker)', FIND_IN_SET('NO_BACKSLASH_ESCAPES', @@SESSION.sql_mode) > 0)"
+            try input.write(contentsOf: Array(question.utf8) + state.delimiter + Array("\n".utf8))
+            answered.wait()
+            guard let value = answer.value else { throw POSIXError(.EPIPE) }
+            return value
+        }
+
         var pending: [UInt8] = []
         var state = DelimiterScript.ScanState()
+        state.noBackslashEscapes = try noBackslashEscapes(after: state)
         var sent = Progress(bytesRead: 0, totalBytes: 0, statementsRun: 0)
         var reported: Int64 = 0
         var readSize = chunkSize
-        while true {
-            let chunk = try file.read(upToCount: readSize) ?? Data()
-            pending.append(contentsOf: chunk)
-            let scanned = DelimiterScript.scan(pending, from: state, isFinal: chunk.isEmpty)
+        var reachedEnd = false
+        var asked = false
+        repeat {
+            // After a statement that mentions sql_mode, what's left is split
+            // the way the client now reads backslashes, before more is read.
+            if !asked {
+                let chunk = try file.read(upToCount: readSize) ?? Data()
+                reachedEnd = chunk.isEmpty
+                pending.append(contentsOf: chunk)
+                sent.bytesRead += Int64(chunk.count)
+            }
+            let scanned = DelimiterScript.scan(pending, from: state, isFinal: reachedEnd, stopsAfterSQLMode: true)
             var whole: [UInt8] = []
             var copied = 0
             for statement in scanned.statements where !keepingDatabaseStatements {
@@ -360,19 +430,19 @@ final class DatabaseRestoreViewModel: ObservableObject {
             }
             whole += pending[copied..<scanned.consumed]
             try input.write(contentsOf: whole)
+            asked = scanned.statements.last.map { DelimiterScript.mentionsSQLMode(pending[$0.range]) } ?? false
             pending.removeFirst(scanned.consumed)
             state = scanned.state
-            sent.bytesRead += Int64(chunk.count)
+            if asked { state.noBackslashEscapes = try noBackslashEscapes(after: state) }
             sent.statementsRun += scanned.statements.count
-            if chunk.isEmpty || sent.bytesRead - reported >= 1 << 20 {
+            if reachedEnd || sent.bytesRead - reported >= 1 << 20 {
                 reported = sent.bytesRead
                 progress(sent)
             }
-            if chunk.isEmpty { return }
             // As in `performRestore`: a statement far bigger than one read
             // stays linear to scan.
             readSize = scanned.statements.isEmpty ? readSize * 2 : chunkSize
-        }
+        } while !reachedEnd || asked
     }
 
     private func describe(_ error: Error) -> String {
