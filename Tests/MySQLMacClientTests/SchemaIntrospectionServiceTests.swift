@@ -3,8 +3,8 @@ import XCTest
 
 /// Runs against a real local MariaDB/MySQL (XAMPP), not a mock — see
 /// MySQLClient.md's validation plan. Requires the `mysqlmacclient_test`
-/// schema (widgets + widget_logs_nopk + widget_view) to exist on
-/// 127.0.0.1:3306.
+/// schema (widgets + widget_logs_nopk + widget_view) to exist on the
+/// `TestDatabase` server (`testenv/fixtures.sql` creates it).
 final class SchemaIntrospectionServiceTests: XCTestCase {
     var service: MySQLService!
     var introspection: SchemaIntrospectionService!
@@ -12,10 +12,10 @@ final class SchemaIntrospectionServiceTests: XCTestCase {
     override func setUp() async throws {
         service = MySQLService()
         try await service.connect(
-            host: "127.0.0.1",
-            port: 3306,
-            username: "root",
-            password: nil,
+            host: TestDatabase.host,
+            port: TestDatabase.port,
+            username: TestDatabase.username,
+            password: TestDatabase.password,
             database: "mysqlmacclient_test"
         )
         introspection = SchemaIntrospectionService(service: service)

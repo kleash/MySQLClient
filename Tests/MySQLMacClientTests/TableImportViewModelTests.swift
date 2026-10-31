@@ -17,10 +17,10 @@ final class TableImportViewModelTests: XCTestCase {
         xlsxFileURL = FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID().uuidString).xlsx")
         service = MySQLService()
         try await service.connect(
-            host: "127.0.0.1",
-            port: 3306,
-            username: "root",
-            password: nil,
+            host: TestDatabase.host,
+            port: TestDatabase.port,
+            username: TestDatabase.username,
+            password: TestDatabase.password,
             database: "mysqlmacclient_test"
         )
         try await service.execute("DELETE FROM widgets")

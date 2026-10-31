@@ -20,10 +20,10 @@ final class SQLConsoleViewModelTests: XCTestCase {
     override func setUp() async throws {
         service = MySQLService()
         try await service.connect(
-            host: "127.0.0.1",
-            port: 3306,
-            username: "root",
-            password: nil,
+            host: TestDatabase.host,
+            port: TestDatabase.port,
+            username: TestDatabase.username,
+            password: TestDatabase.password,
             database: "mysqlmacclient_test"
         )
         introspection = SchemaIntrospectionService(service: service)
@@ -203,10 +203,10 @@ final class SQLConsoleViewModelTests: XCTestCase {
     func testUnqualifiedStatementSucceedsOnAConnectionWithNoDefaultDatabaseWhenHintIsSet() async throws {
         let noDefaultDBService = MySQLService()
         try await noDefaultDBService.connect(
-            host: "127.0.0.1",
-            port: 3306,
-            username: "root",
-            password: nil,
+            host: TestDatabase.host,
+            port: TestDatabase.port,
+            username: TestDatabase.username,
+            password: TestDatabase.password,
             database: nil
         )
         try await noDefaultDBService.execute("DROP TABLE IF EXISTS mysqlmacclient_test.console_scratch_no_default_db")

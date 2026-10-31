@@ -13,10 +13,10 @@ final class AlterTableViewModelTests: XCTestCase {
     override func setUp() async throws {
         service = MySQLService()
         try await service.connect(
-            host: "127.0.0.1",
-            port: 3306,
-            username: "root",
-            password: nil,
+            host: TestDatabase.host,
+            port: TestDatabase.port,
+            username: TestDatabase.username,
+            password: TestDatabase.password,
             database: "mysqlmacclient_test"
         )
         introspection = SchemaIntrospectionService(service: service)

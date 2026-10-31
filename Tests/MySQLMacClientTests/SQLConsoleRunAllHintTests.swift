@@ -162,7 +162,7 @@ final class SQLConsoleRunAllHintTests: XCTestCase {
 final class MySQLServiceVersionTests: XCTestCase {
     func testConnectCapturesTheServerVersion() async throws {
         let service = MySQLService()
-        try await service.connect(host: "127.0.0.1", port: 3306, username: "root", password: nil, database: "mysqlmacclient_test")
+        try await service.connect(host: TestDatabase.host, port: TestDatabase.port, username: TestDatabase.username, password: TestDatabase.password, database: "mysqlmacclient_test")
         defer { Task { try? await service.disconnect() } }
 
         let reported = await service.serverVersion

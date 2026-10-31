@@ -153,6 +153,28 @@ into `MySQLMacClient-<version>.dmg` in the repo root.
 > enforce App Sandbox, so a sandbox permission bug can look fine there and
 > still fail in the packaged app.
 
+### Running the tests
+
+Most tests talk to a real MySQL/MariaDB server, not a mock. The quickest way
+to get one is Docker:
+
+```bash
+testenv/run-tests.sh                  # starts MariaDB 10.4 in Docker, runs every test
+testenv/run-tests.sh --filter Backup  # extra arguments go to `swift test`
+docker compose -f testenv/docker-compose.yml down   # stop the server
+```
+
+The server listens on `127.0.0.1:43306` only, keeps its data in memory, and
+loads `testenv/fixtures.sql` (the `mysqlmacclient_test` schema) on start.
+To use a server of your own instead, load that file into it and run
+`swift test` with `MYSQL_TEST_HOST`, `MYSQL_TEST_PORT`, `MYSQL_TEST_USER`
+and `MYSQL_TEST_PASSWORD` set; without them the tests connect to
+`127.0.0.1:3306` as `root` with no password.
+
+`BackupRoundTripTests` backs a schema of edge cases up, drops it, restores
+the file, and checks that the server reports exactly the same tables,
+views, routines, rows and checksums as before.
+
 ### First Connection
 1. Launch the app → the connection form appears
 2. Fill in host, port (default 3306), username, password, and a connection name

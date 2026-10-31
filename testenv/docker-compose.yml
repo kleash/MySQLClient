@@ -1,0 +1,21 @@
+# The database server the tests run against: MariaDB 10.4, the version
+# XAMPP ships, with an empty root password and the fixture schema loaded.
+# Listens on 127.0.0.1 only. Start it with testenv/run-tests.sh.
+name: mysqlmacclient-test
+services:
+  mariadb:
+    image: mariadb:10.4
+    # The data is a few MB and lives in memory (tmpfs): small caches and
+    # redo logs keep these servers light next to whatever else runs in
+    # Docker.
+    command: --innodb-buffer-pool-size=32M --innodb-log-file-size=8M
+    environment:
+      MARIADB_ALLOW_EMPTY_ROOT_PASSWORD: "1"
+    ports: ["127.0.0.1:43306:3306"]
+    volumes:
+      - ./fixtures.sql:/docker-entrypoint-initdb.d/fixtures.sql:ro
+    tmpfs: /var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "--silent"]
+      interval: 2s
+      retries: 60
