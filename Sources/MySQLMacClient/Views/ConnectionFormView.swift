@@ -153,6 +153,16 @@ struct ConnectionFormView: View {
                     TextField("Optional — lists all if empty", text: $viewModel.database)
                         .visibleFieldBorder()
                 }
+                formRow("Encryption") {
+                    Picker("", selection: $viewModel.tlsMode) {
+                        Text("Off").tag(TLSMode?.none)
+                        ForEach(TLSMode.allCases) { mode in
+                            Text(mode.displayName).tag(TLSMode?.some(mode))
+                        }
+                    }
+                    .labelsHidden()
+                    .fixedSize()
+                }
             }
             .padding(12)
             .background(RoundedRectangle(cornerRadius: 6).fill(Color(nsColor: .textBackgroundColor)))

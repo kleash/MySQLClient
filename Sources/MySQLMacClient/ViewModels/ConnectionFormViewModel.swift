@@ -10,6 +10,7 @@ final class ConnectionFormViewModel: ObservableObject {
     @Published var savePassword: Bool = true
     @Published var database: String = ""
     @Published var note: String = ""
+    @Published var tlsMode: TLSMode?
 
     @Published private(set) var isConnecting = false
     @Published var errorMessage: String?
@@ -38,6 +39,7 @@ final class ConnectionFormViewModel: ObservableObject {
         username = profile.username
         database = profile.database ?? ""
         note = profile.note ?? ""
+        tlsMode = profile.tlsMode
         errorMessage = nil
 
         let storedPassword = (try? keychainService.readPassword(forConnectionId: profile.id)) ?? nil
@@ -67,7 +69,8 @@ final class ConnectionFormViewModel: ObservableObject {
                 port: portNumber,
                 username: username,
                 password: password.isEmpty ? nil : password,
-                database: trimmedDatabase.isEmpty ? nil : trimmedDatabase
+                database: trimmedDatabase.isEmpty ? nil : trimmedDatabase,
+                tls: tlsMode
             )
         } catch {
             errorMessage = String(localized: "Could not connect: \(error.localizedDescription)")
@@ -82,7 +85,8 @@ final class ConnectionFormViewModel: ObservableObject {
             port: portNumber,
             username: username,
             database: trimmedDatabase.isEmpty ? nil : trimmedDatabase,
-            note: trimmedNote.isEmpty ? nil : trimmedNote
+            note: trimmedNote.isEmpty ? nil : trimmedNote,
+            tlsMode: tlsMode
         )
         if savePassword {
             try? keychainService.savePassword(password, forConnectionId: profile.id)

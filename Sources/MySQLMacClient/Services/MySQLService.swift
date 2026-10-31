@@ -42,6 +42,7 @@ struct RawQueryResult: Sendable {
 enum MySQLServiceError: Error, LocalizedError {
     case notConnected
     case invalidIdentifier(String)
+    case notEncrypted
 
     var errorDescription: String? {
         switch self {
@@ -49,6 +50,8 @@ enum MySQLServiceError: Error, LocalizedError {
             return String(localized: "Not connected to a database.")
         case .invalidIdentifier(let identifier):
             return String(localized: "Invalid table/column name: \(identifier)")
+        case .notEncrypted:
+            return String(localized: "The server doesn't offer an encrypted (TLS) connection, so the connection was closed. Turn encryption off for this connection, or enable TLS on the server.")
         }
     }
 }
@@ -66,7 +69,7 @@ actor MySQLService {
     /// write, as `MySQLError.closed`. A single long-lived connection with no
     /// pooling (the MVP's explicit tradeoff) needs this to stay usable
     /// across a normal session instead of erroring on every idle gap.
-    private var lastCredentials: (host: String, port: Int, username: String, password: String?, database: String?)?
+    private var lastCredentials: (host: String, port: Int, username: String, password: String?, database: String?, tls: TLSMode?)?
 
     private(set) var isConnected: Bool = false
 
@@ -87,7 +90,7 @@ actor MySQLService {
     /// `database: nil` connects with no default schema selected — MySQL
     /// allows this, and the caller is then expected to browse
     /// `SHOW DATABASES` and qualify every query as `` `db`.`table` ``.
-    func connect(host: String, port: Int, username: String, password: String?, database: String?) async throws {
+    func connect(host: String, port: Int, username: String, password: String?, database: String?, tls: TLSMode? = nil) async throws {
         if connection != nil {
             try await disconnect()
         }
@@ -102,7 +105,10 @@ actor MySQLService {
                 username: username,
                 database: database ?? "",
                 password: password,
-                tlsConfiguration: nil,
+                tlsConfiguration: tls.map(Self.tlsConfiguration),
+                // A host name for SNI and certificate checks; an IP address
+                // is checked against the certificate's addresses instead.
+                serverHostname: tls != nil && (try? SocketAddress(ipAddress: host, port: 0)) == nil ? host : nil,
                 on: eventLoop
             ).get()
             // MySQLNIO's login asks for collation 255, which only MySQL 8
@@ -111,6 +117,15 @@ actor MySQLService {
             // double-encoded text. Every reconnect comes through here too.
             do {
                 _ = try await conn.simpleQuery("SET NAMES utf8mb4").get()
+                // MySQLNIO carries on unencrypted when the server doesn't
+                // offer TLS, so asking for it isn't enough: check it's on.
+                // shortcut: the login itself has gone out by then; refusing
+                // before it needs a change in MySQLNIO.
+                if tls != nil {
+                    let cipher = try await conn.simpleQuery("SHOW SESSION STATUS LIKE 'Ssl_cipher'").get()
+                        .first?.column("Value")?.string ?? ""
+                    if cipher.isEmpty { throw MySQLServiceError.notEncrypted }
+                }
             } catch {
                 try? await conn.close().get()
                 throw error
@@ -118,7 +133,7 @@ actor MySQLService {
             self.eventLoopGroup = group
             self.connection = conn
             self.isConnected = true
-            self.lastCredentials = (host, port, username, password, database)
+            self.lastCredentials = (host, port, username, password, database, tls)
             // Best-effort: a server that won't answer this is still a
             // perfectly usable connection, so a failure here is swallowed
             // rather than surfaced.
@@ -144,7 +159,8 @@ actor MySQLService {
             port: credentials.port,
             username: credentials.username,
             password: credentials.password,
-            database: nil
+            database: nil,
+            tls: credentials.tls
         )
         await separate.disableAutomaticReconnect()
         return separate
@@ -152,6 +168,14 @@ actor MySQLService {
 
     private func disableAutomaticReconnect() {
         reconnectsAutomatically = false
+    }
+
+    private static func tlsConfiguration(_ mode: TLSMode) -> TLSConfiguration {
+        var configuration = TLSConfiguration.makeClientConfiguration()
+        if mode == .required {
+            configuration.certificateVerification = .none
+        }
+        return configuration
     }
 
     func disconnect() async throws {
@@ -278,7 +302,8 @@ actor MySQLService {
                 port: credentials.port,
                 username: credentials.username,
                 password: credentials.password,
-                database: credentials.database
+                database: credentials.database,
+                tls: credentials.tls
             )
             return try await operation()
         }
