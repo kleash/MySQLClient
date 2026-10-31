@@ -555,6 +555,13 @@ final class BackupRoundTripTests: XCTestCase {
         ) COMMENT = 'archive of `mysqlmacclient_roundtrip`.orders'
         """,
         "CREATE VIEW mentions_database_view AS SELECT 'see `mysqlmacclient_roundtrip`.t for it''s details' AS note",
+        // Dates that don't exist, stored under ALLOW_INVALID_DATES: the
+        // file's SQL mode decides whether they come back or turn into
+        // zero dates.
+        "SET SESSION sql_mode = 'ALLOW_INVALID_DATES'",
+        "CREATE TABLE invalid_dates (id INT PRIMARY KEY, d DATE, dt DATETIME(6))",
+        "INSERT INTO invalid_dates VALUES (1, '2024-02-30', '2023-04-31 23:59:59.123456')",
+        "SET SESSION sql_mode = DEFAULT",
     ]
 
     /// MariaDB-only, after `mariaDBCorpus`.

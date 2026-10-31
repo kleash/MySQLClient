@@ -555,14 +555,16 @@ final class DatabaseBackupViewModel: ObservableObject {
     /// mysqldump does, because the server it's restored on may be set up
     /// differently: the character set the file is written in, the time zone
     /// its TIMESTAMP values are in, and an SQL mode that keeps an explicit 0
-    /// in an AUTO_INCREMENT column (instead of taking the next number) and
-    /// clears modes that would change how the file reads, such as
-    /// `NO_BACKSLASH_ESCAPES`. `writeFooter` puts them back.
+    /// in an AUTO_INCREMENT column (instead of taking the next number), keeps
+    /// a date that doesn't exist (2024-02-30, which a server allowing them
+    /// holds) instead of storing a zero date, and clears modes that would
+    /// change how the file reads, such as `NO_BACKSLASH_ESCAPES`.
+    /// `writeFooter` puts them back.
     private func writeHeader(to fileHandle: FileHandle) async throws {
         var header = """
             SET NAMES utf8mb4;
             SET @OLD_TIME_ZONE = @@TIME_ZONE, TIME_ZONE = '+00:00';
-            SET @OLD_SQL_MODE = @@SQL_MODE, SQL_MODE = 'NO_AUTO_VALUE_ON_ZERO';
+            SET @OLD_SQL_MODE = @@SQL_MODE, SQL_MODE = 'NO_AUTO_VALUE_ON_ZERO,ALLOW_INVALID_DATES';
 
             """
         if options.file.includeCreateDatabaseStatement {
