@@ -500,6 +500,30 @@ final class DatabaseBackupViewModelTests: XCTestCase {
         XCTAssertFalse(viewModel.didFinishSuccessfully, "iptal edilen bir yedekleme tamamlanma uyarısını tetiklememeli")
     }
 
+    /// Cancelled before it has counted every table's rows, the backup stops
+    /// counting: on a big database each COUNT(*) reads a whole table on the
+    /// server.
+    func testCancelBackupStopsCountingRows() async throws {
+        let scratch = try await makeScratchDatabase("mysqlmacclient_backup_cancel", (1...40).map { "CREATE TABLE t\($0) (id INT PRIMARY KEY)" })
+        let viewModel = DatabaseBackupViewModel(service: service, database: scratch)
+        await viewModel.loadDatabasesAndObjects()
+        viewModel.outputFileURL = tempFileURL
+        viewModel.outputLocationIsGranted = true
+        func selectsSoFar() async throws -> Int {
+            let rows = try await service.textQuery("SHOW GLOBAL STATUS LIKE 'Com_select'")
+            return Int(rows.first?.column("Value")?.string ?? "") ?? 0
+        }
+        let before = try await selectsSoFar()
+
+        viewModel.startBackup()
+        viewModel.cancelBackup()
+        while viewModel.isRunning { await Task.yield() }
+
+        let selects = try await selectsSoFar() - before
+        XCTAssertLessThan(selects, 20, "SELECTs the server ran for a cancelled backup of 40 tables")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: tempFileURL.path))
+    }
+
     /// The regression guard for the data-loss bug this app's own
     /// `AtomicFileWriter` fixed: a backup cancelled mid-run must not touch
     /// whatever was already sitting at `outputFileURL` — e.g. yesterday's

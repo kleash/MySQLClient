@@ -387,7 +387,7 @@ final class DatabaseBackupViewModel: ObservableObject {
                 WHERE SCHEMA_NAME = '\(SQLExporter.escapeStringLiteral(database.name))'
                 """).first?.column("collation")?.string ?? ""
             let objects = try await buildObjectPlan()
-            let weights = await unitWeights(for: objects)
+            let weights = try await unitWeights(for: objects)
             totalUnits = weights.reduce(0, +)
             unitsBeforeCurrentObject = 0
             wroteViewStandIns = false
@@ -508,11 +508,13 @@ final class DatabaseBackupViewModel: ObservableObject {
     ///
     /// The `COUNT(*)` per table is one extra round trip each, paid once up
     /// front — negligible against a dump that reads every row anyway, and
-    /// it's what buys a percentage that actually moves.
-    private func unitWeights(for objects: [BackupObject]) async -> [Int] {
+    /// it's what buys a percentage that actually moves. It reads the whole
+    /// table on the server, so a cancelled backup stops counting.
+    private func unitWeights(for objects: [BackupObject]) async throws -> [Int] {
         var weights: [Int] = []
         weights.reserveCapacity(objects.count)
         for object in objects {
+            try Task.checkCancellation()
             var weight = options.mode == .dataOnly ? 0 : 1
             if case .table(let table) = object, options.mode != .structureOnly {
                 weight += (try? await rowCount(of: table)) ?? 0
