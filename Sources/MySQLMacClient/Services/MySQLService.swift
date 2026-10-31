@@ -199,6 +199,21 @@ actor MySQLService {
         reconnectsAutomatically = false
     }
 
+    /// How mysqldump or the mysql client reaches the server this connection
+    /// is on: the same host and port (through an SSH tunnel, its local end),
+    /// user and encryption, with the password only in their option file.
+    func externalToolConnection() throws -> ExternalTool.Connection {
+        guard let credentials = lastCredentials else { throw MySQLServiceError.notConnected }
+        return ExternalTool.Connection(
+            host: credentials.host,
+            port: credentials.port,
+            username: credentials.username,
+            tls: credentials.tls,
+            serverName: credentials.serverName,
+            optionFile: ExternalTool.optionFile(password: credentials.password)
+        )
+    }
+
     static func tlsConfiguration(_ mode: TLSMode) -> TLSConfiguration {
         var configuration = TLSConfiguration.makeClientConfiguration()
         // NIOSSL would still take TLS 1.0 and 1.1, which are broken (RFC 8996).

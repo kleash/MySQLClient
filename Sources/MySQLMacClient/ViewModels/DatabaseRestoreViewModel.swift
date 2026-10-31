@@ -76,6 +76,12 @@ final class DatabaseRestoreViewModel: ObservableObject {
     /// as `mysql <database> < file` would.
     @Published var useDatabaseNamedInFile = false
     @Published var stopOnFirstError = true
+    /// Restore with the mysql client (or mariadb) instead of the built-in
+    /// engine, with the same two options.
+    @Published var usesExternalTool = false
+    /// The client that runs then (`locateExternalTool`), and once it has run,
+    /// the one that did; nil if there's none.
+    @Published private(set) var externalToolURL: URL?
     @Published private(set) var isRunning = false
     @Published private(set) var progress: Progress?
     @Published private(set) var statementErrors: [StatementError] = []
@@ -132,7 +138,7 @@ final class DatabaseRestoreViewModel: ObservableObject {
     /// as do its routines, triggers and events (mysqldump sets the database
     /// collation each was made under around it), and the original keeps
     /// its own. Anything else runs as it is.
-    static func intoChosenDatabase(_ statement: String) -> String? {
+    nonisolated static func intoChosenDatabase(_ statement: String) -> String? {
         guard let match = statement.prefixMatch(of: databaseStatement) else { return statement }
         let verb = match.verb?.uppercased() ?? "USE"
         if verb == "ALTER", match.name == nil { return statement }
@@ -142,13 +148,15 @@ final class DatabaseRestoreViewModel: ObservableObject {
     }
 
     /// The database a USE, CREATE, DROP or ALTER DATABASE names, unquoted.
-    static func databaseName(in statement: String) -> String? {
+    nonisolated static func databaseName(in statement: String) -> String? {
         guard let name = statement.prefixMatch(of: databaseStatement)?.name else { return nil }
         guard let quote = name.first, quote == "`" || quote == "\"" else { return String(name) }
         return name.dropFirst().dropLast().replacingOccurrences(of: "\(quote)\(quote)", with: "\(quote)")
     }
 
-    private static let databaseStatement = #/
+    // `pass` matches it off the main actor. Regex isn't Sendable, but it's
+    // safe to match with from any thread: it compiles itself once, atomically.
+    private nonisolated(unsafe) static let databaseStatement = #/
         (?i) (?<opener> /\*!\d* \s* )?
         (?: USE \b
           | (?<verb> CREATE (?: \s+ OR \s+ REPLACE )? | DROP | ALTER ) \s+ (?: DATABASE | SCHEMA ) \b
@@ -158,9 +166,17 @@ final class DatabaseRestoreViewModel: ObservableObject {
         \s* (?<settings> (?s: .* ) )
         /#
 
+    /// Called from the sheet's `.task`.
+    func locateExternalTool() async {
+        let isMariaDB = await service.serverVersion?.contains("MariaDB") ?? false
+        externalToolURL = ExternalTool.locate(.client, configuredPath: SettingsStore.shared.settings.general.clientToolPath,
+                                              preferMariaDB: isMariaDB)
+    }
+
     private func performRestore() async {
         defer { isRunning = false; restoreTask = nil }
         guard let inputFileURL else { return }
+        if usesExternalTool { return await restoreWithExternalTool(from: inputFileURL) }
         var target: MySQLService?
         var line = 0
         do {
@@ -263,6 +279,100 @@ final class DatabaseRestoreViewModel: ObservableObject {
     private static func hasNoBackslashEscapes(_ connection: MySQLService) async throws -> Bool {
         let mode = try await connection.textQuery("SELECT @@SESSION.sql_mode AS mode").first?.column("mode")?.string
         return mode?.contains("NO_BACKSLASH_ESCAPES") ?? false
+    }
+
+    /// The client reads the file as `pass` hands it over, a whole statement
+    /// at a time, so whatever stops it — an error, Cancel, a file that
+    /// can't be read — it has never been sent part of a statement it could
+    /// run cut short. With `--force` it carries on past errors and still
+    /// ends with exit status 0, so they're found in what it says.
+    private func restoreWithExternalTool(from inputFileURL: URL) async {
+        do {
+            let isMariaDB = await service.serverVersion?.contains("MariaDB") ?? false
+            let tool = try await ExternalTool.find(.client, configuredPath: SettingsStore.shared.settings.general.clientToolPath,
+                                                   preferMariaDB: isMariaDB)
+            externalToolURL = tool.url
+            let connection = try await service.externalToolConnection()
+            let arguments = try tool.restoreArguments(database: useDatabaseNamedInFile ? nil : database.name,
+                                                      stopOnError: stopOnFirstError, connection: connection)
+            let totalBytes = Int64((try? inputFileURL.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0)
+            progress = Progress(bytesRead: 0, totalBytes: totalBytes, statementsRun: 0)
+            let keepsDatabaseStatements = useDatabaseNamedInFile
+            let chunkSize = readChunkSize
+            let messages = try await tool.run(arguments, optionFile: connection.optionFile) { input in
+                try Self.pass(inputFileURL, to: input, keepingDatabaseStatements: keepsDatabaseStatements, chunkSize: chunkSize) { sent in
+                    Task { @MainActor in
+                        guard self.isRunning else { return }
+                        self.progress = Progress(bytesRead: sent.bytesRead, totalBytes: totalBytes, statementsRun: sent.statementsRun)
+                    }
+                }
+            }
+            if messages.split(separator: "\n").contains(where: { $0.hasPrefix("ERROR ") }) {
+                errorMessage = String(localized: "\(tool.name) reported errors; it restored every other statement:\n\(messages)")
+            } else {
+                didFinishSuccessfully = true
+                AnalyticsService.trackFeatureUsed("db_restore")
+            }
+        } catch is CancellationError {
+            errorMessage = String(localized: "Stopped. What the client had already run stays restored.")
+        } catch {
+            errorMessage = describe(error)
+            AnalyticsService.trackError(error, feature: "db_restore")
+        }
+    }
+
+    /// Writes the file to `input` up to the end of its last whole statement
+    /// read so far (where `DelimiterScript.scan` says that is), with the
+    /// file's own database statements turned to the chosen database unless
+    /// `keepingDatabaseStatements`, as the built-in engine turns them
+    /// (`intoChosenDatabase`): left out, or rewritten as an ALTER DATABASE
+    /// without the name, with as many line breaks as before, so the
+    /// client's "at line N" is still the file's line N. `progress` gets the
+    /// bytes read and statements sent, every megabyte and at the end.
+    nonisolated static func pass(_ fileURL: URL, to input: FileHandle, keepingDatabaseStatements: Bool, chunkSize: Int,
+                                 progress: (Progress) -> Void) throws {
+        let file = try FileHandle(forReadingFrom: fileURL)
+        defer { try? file.close() }
+        var pending: [UInt8] = []
+        var state = DelimiterScript.ScanState()
+        var sent = Progress(bytesRead: 0, totalBytes: 0, statementsRun: 0)
+        var reported: Int64 = 0
+        var readSize = chunkSize
+        while true {
+            let chunk = try file.read(upToCount: readSize) ?? Data()
+            pending.append(contentsOf: chunk)
+            let scanned = DelimiterScript.scan(pending, from: state, isFinal: chunk.isEmpty)
+            var whole: [UInt8] = []
+            var copied = 0
+            for statement in scanned.statements where !keepingDatabaseStatements {
+                let original = pending[statement.range]
+                let sql = String(decoding: original, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
+                let replacement = intoChosenDatabase(sql)
+                guard replacement != sql else { continue }
+                // Left out, or rewritten, but only from bytes that are exactly
+                // the text read.
+                let rewritten = String(bytes: original, encoding: .utf8) == nil ? nil : replacement
+                let text = Array((rewritten ?? "").utf8)
+                let newline = UInt8(ascii: "\n")
+                let lineBreaks = original.count { $0 == newline } - text.count { $0 == newline }
+                whole += pending[copied..<statement.range.lowerBound] + text + Array(repeating: newline, count: lineBreaks)
+                copied = statement.range.upperBound
+            }
+            whole += pending[copied..<scanned.consumed]
+            try input.write(contentsOf: whole)
+            pending.removeFirst(scanned.consumed)
+            state = scanned.state
+            sent.bytesRead += Int64(chunk.count)
+            sent.statementsRun += scanned.statements.count
+            if chunk.isEmpty || sent.bytesRead - reported >= 1 << 20 {
+                reported = sent.bytesRead
+                progress(sent)
+            }
+            if chunk.isEmpty { return }
+            // As in `performRestore`: a statement far bigger than one read
+            // stays linear to scan.
+            readSize = scanned.statements.isEmpty ? readSize * 2 : chunkSize
+        }
     }
 
     private func describe(_ error: Error) -> String {

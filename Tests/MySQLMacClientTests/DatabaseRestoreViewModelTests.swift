@@ -427,4 +427,86 @@ final class DatabaseRestoreViewModelTests: XCTestCase {
         XCTAssertEqual(restored, Array(stride(from: 1, through: (line - 1) / 2, by: 1)))
         XCTAssertLessThan(restored.count, 20)
     }
+
+    // MARK: - With the mysql client
+
+    private func restoreWithTheMysqlClient(_ contents: Data, configure: (DatabaseRestoreViewModel) -> Void = { _ in }) async throws -> DatabaseRestoreViewModel {
+        guard ExternalTool.locate(.client, configuredPath: "", preferMariaDB: true) != nil else {
+            throw XCTSkip("No mysql or mariadb client is installed.")
+        }
+        let viewModel = try await restore(contents) {
+            $0.usesExternalTool = true
+            configure($0)
+        }
+        XCTAssertNotNil(viewModel.externalToolURL, "the client must have run, not the built-in engine")
+        return viewModel
+    }
+
+    /// The file's own database statements are blanked out on the way to the
+    /// client, line breaks kept, so its error still names the file's line.
+    func testMysqlClientSkipsTheFilesOwnDatabaseStatementsAndKeepsTheirLines() async throws {
+        let viewModel = try await restoreWithTheMysqlClient(Data("""
+            /*!40000 DROP DATABASE IF EXISTS `\(other)`*/;
+            CREATE DATABASE IF NOT EXISTS `\(other)`
+              CHARACTER SET utf8mb4;
+            use `\(other)`;
+            CREATE TABLE t (id INT PRIMARY KEY);
+            INSERT INTO t VALUES (7);
+            INSERT INTO t VALUES (7);
+            INSERT INTO t VALUES (8);
+            """.utf8))
+
+        XCTAssertTrue(viewModel.errorMessage?.contains("at line 7") ?? false, viewModel.errorMessage ?? "nil")
+        XCTAssertFalse(viewModel.didFinishSuccessfully)
+        let restored = try await ids(in: "t")
+        XCTAssertEqual(restored, [7], "nothing after the failed statement may run")
+        let others = try await service.query("SELECT SCHEMA_NAME FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = '\(other)'")
+        XCTAssertTrue(others.isEmpty, "the file's own database must not be created")
+    }
+
+    /// The client stops at the error while megabytes of the file are still
+    /// on their way to it: the restore must say so, not crash on the closed
+    /// pipe or pass for finished.
+    func testMysqlClientStopsAtTheFirstFailedStatementWhileTheFileIsStillBeingSent() async throws {
+        var lines = ["CREATE TABLE t (id INT PRIMARY KEY);", "INSERT INTO t VALUES (1);", "INSERT INTO t VALUES (1);"]
+        lines += (2...200_000).map { "INSERT INTO t VALUES (\($0));" }
+        let viewModel = try await restoreWithTheMysqlClient(Data(lines.joined(separator: "\n").utf8))
+
+        XCTAssertTrue(viewModel.errorMessage?.contains("at line 3") ?? false, viewModel.errorMessage ?? "nil")
+        XCTAssertFalse(viewModel.didFinishSuccessfully)
+        let restored = try await ids(in: "t")
+        XCTAssertEqual(restored, [1])
+    }
+
+    /// With --force the client carries on and still exits with 0, so its
+    /// errors have to be read from what it says.
+    func testMysqlClientCarriesOnPastFailedStatementsAndReportsThem() async throws {
+        let viewModel = try await restoreWithTheMysqlClient(Data("""
+            CREATE TABLE t (id INT PRIMARY KEY);
+            INSERT INTO t VALUES (1);
+            INSERT INTO t VALUES (1);
+            INSERT INTO t VALUES (2);
+            """.utf8)) { $0.stopOnFirstError = false }
+
+        XCTAssertTrue(viewModel.errorMessage?.contains("Duplicate entry") ?? false, viewModel.errorMessage ?? "nil")
+        XCTAssertFalse(viewModel.didFinishSuccessfully)
+        let restored = try await ids(in: "t")
+        XCTAssertEqual(restored, [1, 2])
+    }
+
+    /// What the built-in restore refuses as not UTF-8 (a mysqldump file made
+    /// without --hex-blob), and a line break written raw inside a string:
+    /// the client must store exactly these bytes.
+    func testMysqlClientRestoresRawBytesExactly() async throws {
+        var contents = Data("CREATE TABLE t (id INT PRIMARY KEY, b BLOB, txt TEXT);\nINSERT INTO t VALUES (1, _binary '".utf8)
+        contents.append(contentsOf: [0xFF, 0xFE, 0x5C, 0x30, 0xC3])  // \0 escaped, as mysqldump writes it
+        contents.append(Data("', 'line\r\nbreak');\n".utf8))
+        let viewModel = try await restoreWithTheMysqlClient(contents)
+
+        XCTAssertNil(viewModel.errorMessage)
+        XCTAssertTrue(viewModel.didFinishSuccessfully)
+        let row = try await service.textQuery("SELECT HEX(b) AS b, HEX(txt) AS txt FROM `\(database)`.t").first
+        XCTAssertEqual(row?.column("b")?.string, "FFFE00C3")
+        XCTAssertEqual(row?.column("txt")?.string, "6C696E650D0A627265616B")
+    }
 }

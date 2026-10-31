@@ -37,6 +37,10 @@ struct AppSettings: Codable, Equatable {
         /// Opt-out for `AnalyticsService`'s anonymous usage pings — see
         /// `docs/privacy.html` for what is and isn't collected.
         var analyticsOptOut = false
+        /// mysqldump (or mariadb-dump) and mysql (or mariadb) for a backup
+        /// or restore made with them; empty: `ExternalTool.locate` finds them.
+        var dumpToolPath = ""
+        var clientToolPath = ""
 
         init() {}
         init(from decoder: Decoder) throws {
@@ -46,6 +50,8 @@ struct AppSettings: Codable, Equatable {
             toolbarIconSize = try container.decodeIfPresent(Double.self, forKey: .toolbarIconSize) ?? defaults.toolbarIconSize
             gridToolbarIconSize = try container.decodeIfPresent(Double.self, forKey: .gridToolbarIconSize) ?? defaults.gridToolbarIconSize
             analyticsOptOut = try container.decodeIfPresent(Bool.self, forKey: .analyticsOptOut) ?? defaults.analyticsOptOut
+            dumpToolPath = try container.decodeIfPresent(String.self, forKey: .dumpToolPath) ?? defaults.dumpToolPath
+            clientToolPath = try container.decodeIfPresent(String.self, forKey: .clientToolPath) ?? defaults.clientToolPath
         }
     }
 

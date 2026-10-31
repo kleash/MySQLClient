@@ -27,6 +27,7 @@ struct DatabaseRestoreView: View {
             }
 
             sourceFileRow
+            enginePicker
             optionsCard
 
             if let errorMessage = viewModel.errorMessage {
@@ -45,6 +46,7 @@ struct DatabaseRestoreView: View {
         .padding(24)
         .frame(minWidth: 620, idealWidth: 680, minHeight: 440, idealHeight: 520)
         .background(theme.windowBackground)
+        .task { await viewModel.locateExternalTool() }
         .alert("Restore Complete", isPresented: $viewModel.didFinishSuccessfully) {
             Button("OK") {}
         } message: {
@@ -74,6 +76,34 @@ struct DatabaseRestoreView: View {
                     .buttonStyle(SchemaSecondaryButtonStyle(theme: theme))
                     .disabled(viewModel.isRunning)
             }
+        }
+    }
+
+    private var enginePicker: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            sectionTitle("ENGINE")
+            Picker("", selection: $viewModel.usesExternalTool) {
+                Text("Built-in").tag(false)
+                Text(verbatim: viewModel.externalToolURL?.lastPathComponent ?? "mysql").tag(true)
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .frame(maxWidth: 240)
+            .disabled(viewModel.isRunning || !ExternalTool.isAvailable)
+            Group {
+                if !ExternalTool.isAvailable {
+                    Text("The App Sandbox keeps this build from running command-line tools installed outside the app.")
+                } else if viewModel.usesExternalTool, let toolURL = viewModel.externalToolURL {
+                    Text(verbatim: toolURL.path)
+                        .font(.system(size: 12, design: .monospaced))
+                        .textSelection(.enabled)
+                } else if viewModel.usesExternalTool {
+                    Text("No mysql or mariadb client was found. Choose one in Settings ▸ General.")
+                        .foregroundStyle(.orange)
+                }
+            }
+            .font(.caption)
+            .foregroundStyle(theme.textSecondary)
         }
     }
 
@@ -160,7 +190,8 @@ struct DatabaseRestoreView: View {
                 }
                 .keyboardShortcut(.defaultAction)
                 .buttonStyle(SchemaPrimaryButtonStyle(theme: theme))
-                .disabled(viewModel.isRunning || viewModel.inputFileURL == nil)
+                .disabled(viewModel.isRunning || viewModel.inputFileURL == nil
+                          || (viewModel.usesExternalTool && viewModel.externalToolURL == nil))
             }
         }
     }

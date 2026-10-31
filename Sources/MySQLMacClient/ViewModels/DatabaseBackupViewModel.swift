@@ -94,6 +94,18 @@ final class DatabaseBackupViewModel: ObservableObject {
         }
     }
 
+    /// Back up with mysqldump (or mariadb-dump) instead of the built-in
+    /// engine: always the whole database, with its options rather than the
+    /// ones above (`ExternalTool.dumpArguments`).
+    @Published var usesExternalTool = false
+    /// The tool that runs then, found when the objects load; nil if there's none.
+    @Published private(set) var externalToolURL: URL?
+    /// mysqldump writes every value the way the server prints it, and
+    /// MariaDB prints a FLOAT to 6 significant digits (16777216 as
+    /// 16777200): there a FLOAT column wouldn't come back as it was.
+    var externalToolRoundsFloats: Bool { serverIsMariaDB && hasFloatColumns }
+    @Published private var hasFloatColumns = false
+
     @Published var outputFileURL: URL?
     /// Whether `outputFileURL` currently points at a location the sandbox
     /// has actually granted write access to — see the identical flag in
@@ -158,6 +170,9 @@ final class DatabaseBackupViewModel: ObservableObject {
     /// The database's default collation, read as a run begins — see
     /// `creationStatement`.
     private var databaseCollation = ""
+    private var serverIsMariaDB = false
+    /// Tables and views mysqldump has started on in the run in flight.
+    private var externalObjectsStarted = 0
 
     init(service: MySQLService, database: DatabaseInfo) {
         self.service = service
@@ -177,6 +192,9 @@ final class DatabaseBackupViewModel: ObservableObject {
         }
         outputFileURL = defaultOutputURL()
         outputLocationIsGranted = false
+        serverIsMariaDB = await service.serverVersion?.contains("MariaDB") ?? false
+        externalToolURL = ExternalTool.locate(.dump, configuredPath: SettingsStore.shared.settings.general.dumpToolPath,
+                                              preferMariaDB: serverIsMariaDB)
         await loadObjects()
     }
 
@@ -234,6 +252,11 @@ final class DatabaseBackupViewModel: ObservableObject {
             errorMessage = describe(error)
             return
         }
+        let floatColumns = try? await service.query(
+            "SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND DATA_TYPE = 'float' LIMIT 1",
+            [MySQLData(string: database.name)]
+        )
+        hasFloatColumns = !(floatColumns ?? []).isEmpty
 
         do {
             allProcedures = try await introspection.listRoutines(.procedure, inDatabase: database.name)
@@ -383,6 +406,8 @@ final class DatabaseBackupViewModel: ObservableObject {
         defer { isRunning = false; backupTask = nil }
 
         guard let outputFileURL else { return }
+        // Before the backup's own connection: mysqldump opens its own.
+        if usesExternalTool { return await backUpWithExternalTool(to: outputFileURL) }
         let shared = service
         var source: MySQLService?
         do {
@@ -458,6 +483,51 @@ final class DatabaseBackupViewModel: ObservableObject {
         // Also ends the backup's transaction and releases its locks.
         try? await source?.disconnect()
         service = shared
+    }
+
+    /// mysqldump writes straight into `AtomicFileWriter`'s temporary file,
+    /// which replaces the destination only once mysqldump has ended with
+    /// exit status 0; otherwise, or when cancelled, it's thrown away. Its
+    /// `--verbose` lines name each table and view as it starts on it, which
+    /// is what the progress counts.
+    private func backUpWithExternalTool(to outputFileURL: URL) async {
+        let total = allTables.count + allViews.count
+        externalObjectsStarted = 0
+        progress = Progress(completedObjects: 0, totalObjects: total, completedUnits: 0, totalUnits: total, currentObjectDescription: "")
+        do {
+            let tool = try await ExternalTool.find(.dump, configuredPath: SettingsStore.shared.settings.general.dumpToolPath,
+                                                   preferMariaDB: serverIsMariaDB)
+            externalToolURL = tool.url
+            let connection = try await service.externalToolConnection()
+            let arguments = try tool.dumpArguments(database: database.name, connection: connection)
+            try await AtomicFileWriter.write(to: outputFileURL) { fileHandle in
+                _ = try await tool.run(arguments, optionFile: connection.optionFile, output: fileHandle) { line in
+                    let prefix = "-- Retrieving table structure for table "
+                    guard line.hasPrefix(prefix), line.hasSuffix("...") else { return }
+                    let name = String(line.dropFirst(prefix.count).dropLast(3))
+                    Task { @MainActor in self.externalObjectStarted(name) }
+                }
+            }
+            progress = Progress(completedObjects: total, totalObjects: total, completedUnits: total, totalUnits: total,
+                                currentObjectDescription: String(localized: "Completed"))
+            didFinishSuccessfully = true
+            AnalyticsService.trackFeatureUsed("db_backup")
+        } catch is CancellationError {
+            // User-initiated — not an error to surface.
+        } catch {
+            errorMessage = describe(error)
+            AnalyticsService.trackError(error, feature: "db_backup")
+        }
+    }
+
+    /// Ignored once the run is over: a line's update can arrive after the
+    /// final one.
+    private func externalObjectStarted(_ name: String) {
+        guard isRunning, let total = progress?.totalObjects else { return }
+        externalObjectsStarted += 1
+        let done = min(externalObjectsStarted - 1, total)
+        progress = Progress(completedObjects: done, totalObjects: total, completedUnits: done, totalUnits: total,
+                            currentObjectDescription: String(localized: "Table: \(name)"))
     }
 
     /// Tables first, with CREATE+DATA interleaved per table (not two

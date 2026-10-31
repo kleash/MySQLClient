@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// The Ayarlar window content (native `Settings` scene): three tabs plus a
@@ -55,6 +56,16 @@ struct SettingsView: View {
 
             sizeStepper("Main toolbar icon size", value: $settingsStore.settings.general.toolbarIconSize, range: 20...36)
             sizeStepper("Table toolbar icon size", value: $settingsStore.settings.general.gridToolbarIconSize, range: 20...36)
+
+            if ExternalTool.isAvailable {
+                Divider().padding(.vertical, 4)
+
+                toolPathRow("mysqldump / mariadb-dump", path: $settingsStore.settings.general.dumpToolPath)
+                toolPathRow("mysql / mariadb", path: $settingsStore.settings.general.clientToolPath)
+                Text("Used when a backup or restore runs with the command-line tools. Leave empty to use the ones found in Homebrew, /usr/local/mysql, MySQL Workbench or XAMPP (MariaDB's own for a MariaDB server).")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
 
             resetSection
         }
@@ -216,6 +227,25 @@ struct SettingsView: View {
     }
 
     // MARK: - Shared pieces
+
+    /// A tool's path, typed or chosen; empty: found on its own.
+    private func toolPathRow(_ title: String, path: Binding<String>) -> some View {
+        LabeledContent {
+            HStack(spacing: 6) {
+                TextField("", text: path, prompt: Text("Automatic"))
+                Button("Choose…") {
+                    let panel = NSOpenPanel()
+                    panel.canChooseDirectories = false
+                    // Keeps the path of a Homebrew link, which outlives an
+                    // upgrade, rather than the versioned file it points to.
+                    panel.resolvesAliases = false
+                    if panel.runModal() == .OK, let url = panel.url { path.wrappedValue = url.path }
+                }
+            }
+        } label: {
+            Text(verbatim: title)
+        }
+    }
 
     private func sizeStepper(_ title: LocalizedStringKey, value: Binding<Double>, range: ClosedRange<Double>) -> some View {
         LabeledContent(title) {

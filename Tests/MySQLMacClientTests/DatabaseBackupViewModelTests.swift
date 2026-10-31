@@ -715,6 +715,77 @@ final class DatabaseBackupViewModelTests: XCTestCase {
         XCTAssertNil(viewModel.errorMessage)
     }
 
+    /// The private folders the external tools' option files go in.
+    private func toolFolders() -> Set<String> {
+        let all = (try? FileManager.default.contentsOfDirectory(atPath: FileManager.default.temporaryDirectory.path)) ?? []
+        return Set(all.filter { $0.hasPrefix("mysqlclient-tool-") })
+    }
+
+    /// Cancelled while mysqldump waits for a table another session has
+    /// locked: it's killed there and then (the backup ends while the lock is
+    /// still held), the file already at the path stays as it was, and the
+    /// option file with the password is gone.
+    func testCancellingAMysqldumpBackupKillsItAndLeavesNothingBehind() async throws {
+        guard ExternalTool.locate(.dump, configuredPath: "", preferMariaDB: true) != nil else {
+            throw XCTSkip("No mysqldump or mariadb-dump is installed.")
+        }
+        try Data("yesterday's backup".utf8).write(to: tempFileURL)
+        let locker = MySQLService()
+        try await locker.connect(host: TestDatabase.host, port: TestDatabase.port, username: TestDatabase.username,
+                                 password: TestDatabase.password, database: "mysqlmacclient_test")
+        _ = try await locker.rawQuery("LOCK TABLES widgets WRITE")
+        let foldersBefore = toolFolders()
+
+        let viewModel = makeViewModel()
+        await viewModel.loadDatabasesAndObjects()
+        viewModel.usesExternalTool = true
+        viewModel.outputFileURL = tempFileURL
+        viewModel.outputLocationIsGranted = true
+        viewModel.startBackup()
+
+        // On a connection of its own: one the backup were using would wait
+        // behind it.
+        let watcher = MySQLService()
+        try await watcher.connect(host: TestDatabase.host, port: TestDatabase.port, username: TestDatabase.username,
+                                  password: TestDatabase.password, database: nil)
+        var waiting = false
+        for _ in 0..<200 where !waiting {
+            try await Task.sleep(for: .milliseconds(50))
+            waiting = try await watcher.textQuery("""
+                SELECT COUNT(*) AS n FROM information_schema.PROCESSLIST
+                WHERE STATE LIKE '%lock%' AND INFO LIKE '%widgets%'
+                """).first?.column("n")?.string != "0"
+        }
+        try await watcher.disconnect()
+        XCTAssertTrue(waiting, "mysqldump never got to the locked table")
+        // While it runs, the password is in a file only this user can read,
+        // in a folder only this user can open.
+        let running = toolFolders().subtracting(foldersBefore)
+        XCTAssertEqual(running.count, 1)
+        for folder in running {
+            let folderURL = FileManager.default.temporaryDirectory.appendingPathComponent(folder)
+            XCTAssertEqual(try FileManager.default.attributesOfItem(atPath: folderURL.path)[.posixPermissions] as? Int, 0o700)
+            for file in try FileManager.default.contentsOfDirectory(atPath: folderURL.path) {
+                let attributes = try FileManager.default.attributesOfItem(atPath: folderURL.appendingPathComponent(file).path)
+                XCTAssertEqual(attributes[.posixPermissions] as? Int, 0o600, file)
+            }
+        }
+
+        viewModel.cancelBackup()
+        for _ in 0..<200 where viewModel.isRunning {
+            try await Task.sleep(for: .milliseconds(50))
+        }
+        XCTAssertFalse(viewModel.isRunning, "mysqldump must be killed, not left waiting for the lock")
+        _ = try await locker.rawQuery("UNLOCK TABLES")
+        try await locker.disconnect()
+        while viewModel.isRunning { await Task.yield() }
+
+        XCTAssertEqual(try String(contentsOf: tempFileURL, encoding: .utf8), "yesterday's backup")
+        XCTAssertEqual(toolFolders(), foldersBefore, "the option file must be deleted")
+        XCTAssertFalse(viewModel.didFinishSuccessfully)
+        XCTAssertNil(viewModel.errorMessage)
+    }
+
     func testRunBackupToUnwritablePathSetsErrorMessageInsteadOfCrashing() async throws {
         let viewModel = makeViewModel()
         await viewModel.loadDatabasesAndObjects()

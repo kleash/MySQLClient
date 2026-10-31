@@ -17,8 +17,11 @@ import XCTest
 /// `NO_BACKSLASH_ESCAPES`, zero dates refused and latin1 while restoring):
 /// a dump has to carry every setting its contents depend on, because the
 /// server it's restored on may differ.
+///
+/// The same comparison checks backups made with mysqldump and restores run
+/// by the mysql client, each with the other engine as well.
 @MainActor
-final class BackupRoundTripTests: XCTestCase {
+class BackupRoundTripTests: XCTestCase {
     private let database = "mysqlmacclient_roundtrip"
     private let copy = "mysqlmacclient_roundtrip_copy"
     private var service: MySQLService!
@@ -101,20 +104,7 @@ final class BackupRoundTripTests: XCTestCase {
     func testBackupRestoredWithTheAppIntoAnotherDatabaseMatchesTheOriginal() async throws {
         let before = try await fingerprint(of: database)
         try await backUp()
-        _ = try await service.rawQuery("CREATE DATABASE `\(copy)`")
-
-        let restore = DatabaseRestoreViewModel(service: service, database: DatabaseInfo(name: copy))
-        restore.inputFileURL = dumpURL
-        restore.readChunkSize = 7
-        restore.startRestore()
-        while restore.isRunning { await Task.yield() }
-        XCTAssertNil(restore.errorMessage)
-        XCTAssertEqual(restore.statementErrors, [])
-
-        assertSame(try await fingerprint(of: database), before)
-        var restored = try await fingerprint(of: copy)
-        restored["database"] = restored["database"]?.replacingOccurrences(of: copy, with: database)
-        assertSame(restored, before)
+        try await assertRestoredCopyMatches(before, usesExternalTool: false)
     }
 
     /// Each page of a composite key is read as a range of the key's index:
@@ -168,9 +158,108 @@ final class BackupRoundTripTests: XCTestCase {
 
         // Without what's in each table, which structure only leaves out.
         func structure(_ fingerprint: [String: String]) -> [String: String] {
-            fingerprint.filter { !($0.key.hasPrefix("table ") && ($0.key.hasSuffix(" checksum") || $0.key.hasSuffix(" rows"))) }
+            fingerprint.filter { key, _ in
+                !(key.hasPrefix("table ") && [" checksum", " rows", " as printed"].contains(where: key.hasSuffix))
+            }
         }
         assertSame(structure(try await fingerprint(of: database)), structure(before))
+    }
+
+    // MARK: - mysqldump and the mysql client
+
+    /// A mysqldump backup recreates the database it was made from, with its
+    /// default character set, when the mysql client runs it as it is.
+    func testMysqldumpBackupRestoredWithTheMysqlClientRecreatesTheDatabase() async throws {
+        try await dropWhatMysqldumpLoses()
+        let before = try await fingerprint(of: database)
+        try await backUpWithMysqldump()
+        _ = try await service.rawQuery("DROP DATABASE `\(database)`")
+        try await restoreWithTheApp(into: database, usesExternalTool: true, useDatabaseNamedInFile: true)
+
+        assertSame(await mysqldumpKeeps(try await fingerprint(of: database)), await mysqldumpKeeps(before))
+    }
+
+    func testMysqldumpBackupRestoredWithTheMysqlClientIntoAnotherDatabaseMatches() async throws {
+        try await dropWhatMysqldumpLoses()
+        let before = try await fingerprint(of: database)
+        try await backUpWithMysqldump()
+        try await assertRestoredCopyMatches(before, usesExternalTool: true, madeWithMysqldump: true)
+    }
+
+    func testMysqldumpBackupRestoredWithTheAppIntoAnotherDatabaseMatches() async throws {
+        try await dropWhatMysqldumpLoses()
+        let before = try await fingerprint(of: database)
+        try await backUpWithMysqldump()
+        try await assertRestoredCopyMatches(before, usesExternalTool: false, madeWithMysqldump: true)
+    }
+
+    func testBackupRestoredWithTheMysqlClientIntoAnotherDatabaseMatches() async throws {
+        let before = try await fingerprint(of: database)
+        try await backUp()
+        try await assertRestoredCopyMatches(before, usesExternalTool: true)
+    }
+
+    /// Restores the backup into a new database next to the original, made
+    /// with the server's defaults, with the dialog's defaults (the file's own
+    /// USE and CREATE DATABASE skipped, its character set and collation given
+    /// to the copy), and compares both with `before`.
+    private func assertRestoredCopyMatches(_ before: [String: String], usesExternalTool: Bool, madeWithMysqldump: Bool = false,
+                                           file: StaticString = #filePath, line: UInt = #line) async throws {
+        _ = try await service.rawQuery("CREATE DATABASE `\(copy)`")
+        try await restoreWithTheApp(into: copy, usesExternalTool: usesExternalTool)
+
+        assertSame(try await fingerprint(of: database), before, file: file, line: line)
+        var restored = try await fingerprint(of: copy)
+        restored["database"] = restored["database"]?.replacingOccurrences(of: copy, with: database)
+        var original = before
+        if madeWithMysqldump {
+            restored = await mysqldumpKeeps(restored)
+            original = await mysqldumpKeeps(original)
+        }
+        assertSame(restored, original, file: file, line: line)
+    }
+
+    /// What mysqldump loses that the built-in engine keeps, dropped before a
+    /// mysqldump round trip so that everything else is compared exactly.
+    private func dropWhatMysqldumpLoses() async throws {
+        for statement in [
+            // MySQL's mysqldump asks MariaDB for a collation it doesn't know,
+            // reads names in latin1, and fails the backup on this one.
+            "DROP TABLE `tick``\u{301}mark`",
+            // An ENUM's error value and a SET's '' member, both written as ''.
+            "DROP TABLE empty_member",
+            // Dates that don't exist, zero dates under the file's SQL mode.
+            "DROP TABLE invalid_dates",
+            // -0, written as the integer, which reads back as 0.
+            "DROP TABLE negative_zero",
+            // Created on a stand-in for the view they're built on: never
+            // updatable again, and WITH CHECK OPTION refused.
+            "DROP VIEW a_view_on_view, a_checked_on_view",
+            // MariaDB's SHOW CREATE TRIGGER, as typed, names this database:
+            // restored into another one, it comes back here.
+            "DROP TRIGGER qualified_trigger",
+            // Its LOCK TABLES around the rows leaves out the sequence their
+            // DEFAULT takes numbers from (MariaDB only).
+            "DROP TABLE IF EXISTS a_uses_sequence",
+        ] {
+            _ = try await service.rawQuery(statement)
+        }
+    }
+
+    /// What a mysqldump backup keeps of `fingerprint`. mysqldump writes
+    /// every value the way the server prints it, and MariaDB prints a FLOAT
+    /// to 6 significant digits (16777216 as 16777200, 1.2345678 as
+    /// 1.23457), so there FLOAT values come back as printed, not as they
+    /// were: a table with FLOAT columns (the corpus keeps them to tables of
+    /// their own) is compared by its values as printed rather than by its
+    /// checksum. Everything else has to come back exactly.
+    private func mysqldumpKeeps(_ fingerprint: [String: String]) async -> [String: String] {
+        guard await service.serverVersion?.contains("MariaDB") ?? false else { return fingerprint }
+        return fingerprint.filter { key, _ in
+            guard key.hasPrefix("table "), key.hasSuffix(" checksum") else { return true }
+            let table = key.dropLast(" checksum".count)
+            return !fingerprint.keys.contains { $0.hasPrefix(table + " ") && $0.hasSuffix(" as printed") }
+        }
     }
 
     private func assertSame(_ actual: [String: String], _ expected: [String: String], file: StaticString = #filePath, line: UInt = #line) {
@@ -181,7 +270,9 @@ final class BackupRoundTripTests: XCTestCase {
 
     // MARK: - Steps
 
-    private func connect() async throws -> MySQLService {
+    /// A new connection to the server under test; `SSHBackupRoundTripTests`
+    /// goes through an SSH tunnel instead.
+    func connect() async throws -> MySQLService {
         let service = MySQLService()
         try await service.connect(
             host: TestDatabase.host,
@@ -191,6 +282,52 @@ final class BackupRoundTripTests: XCTestCase {
             database: nil
         )
         return service
+    }
+
+    private func skipUnlessToolsAreInstalled() throws {
+        guard ExternalTool.locate(.dump, configuredPath: "", preferMariaDB: true) != nil,
+              ExternalTool.locate(.client, configuredPath: "", preferMariaDB: true) != nil else {
+            throw XCTSkip("The MySQL or MariaDB command-line tools aren't installed.")
+        }
+    }
+
+    /// The whole database with mysqldump (or mariadb-dump), as the dialog
+    /// runs it.
+    private func backUpWithMysqldump() async throws {
+        try skipUnlessToolsAreInstalled()
+        let viewModel = DatabaseBackupViewModel(service: service, database: DatabaseInfo(name: database))
+        await viewModel.loadDatabasesAndObjects()
+        viewModel.usesExternalTool = true
+        viewModel.outputFileURL = dumpURL
+        viewModel.outputLocationIsGranted = true
+        viewModel.startBackup()
+        while viewModel.isRunning { await Task.yield() }
+        XCTAssertNil(viewModel.errorMessage)
+        XCTAssertTrue(viewModel.didFinishSuccessfully)
+        // The corpus has FLOAT columns: the dialog warns about them on MariaDB.
+        let isMariaDB = await service.serverVersion?.contains("MariaDB") ?? false
+        XCTAssertEqual(viewModel.externalToolRoundsFloats, isMariaDB)
+        // The file is mysqldump's, not the built-in engine's.
+        let header = try FileHandle(forReadingFrom: dumpURL).read(upToCount: 40) ?? Data()
+        XCTAssertTrue(String(decoding: header, as: UTF8.self).contains(" dump "), String(decoding: header, as: UTF8.self))
+    }
+
+    /// `DatabaseRestoreViewModel`, built-in or with the mysql client, reading
+    /// the file in chunks small enough to cut every statement, string and
+    /// character.
+    private func restoreWithTheApp(into target: String, usesExternalTool: Bool, useDatabaseNamedInFile: Bool = false) async throws {
+        if usesExternalTool { try skipUnlessToolsAreInstalled() }
+        let restore = DatabaseRestoreViewModel(service: service, database: DatabaseInfo(name: target))
+        restore.inputFileURL = dumpURL
+        restore.usesExternalTool = usesExternalTool
+        restore.useDatabaseNamedInFile = useDatabaseNamedInFile
+        restore.readChunkSize = 7
+        restore.startRestore()
+        while restore.isRunning { await Task.yield() }
+        XCTAssertNil(restore.errorMessage)
+        XCTAssertEqual(restore.statementErrors, [])
+        XCTAssertTrue(restore.didFinishSuccessfully)
+        XCTAssertEqual(restore.externalToolURL != nil, usesExternalTool, "the restore must run with the engine asked for")
     }
 
     /// Everything selected, default options (unless `configure` changes
@@ -276,6 +413,15 @@ final class BackupRoundTripTests: XCTestCase {
             result["\(kind) \(name) checksum"] = checksum?.column("Checksum")?.string
             let count = try await service.rawQuery("SELECT COUNT(*) AS n FROM \(quoted)").rows.first
             result["\(kind) \(name) rows"] = count?.column("n")?.string
+            // FLOAT values as the server prints them (`mysqldumpKeeps`).
+            let floatColumns = try await service.textQuery("""
+                SELECT COLUMN_NAME AS name FROM information_schema.COLUMNS
+                WHERE TABLE_SCHEMA = '\(database)' AND TABLE_NAME = '\(name)' AND DATA_TYPE = 'float' ORDER BY ORDINAL_POSITION
+                """).compactMap { $0.column("name")?.string }
+            for column in floatColumns {
+                let values = try await service.textQuery("SELECT `\(column.replacingOccurrences(of: "`", with: "``"))` AS v FROM \(quoted) ORDER BY 1")
+                result["\(kind) \(name) \(column) as printed"] = values.map { $0.column("v")?.string ?? "NULL" }.joined(separator: ", ")
+            }
         }
 
         // A trigger by its parts, the order it fires in included, rather than
@@ -338,23 +484,26 @@ final class BackupRoundTripTests: XCTestCase {
         "CREATE TABLE ai_not_primary (code VARCHAR(10) NOT NULL PRIMARY KEY, seq INT NOT NULL AUTO_INCREMENT, UNIQUE KEY (seq))",
         "INSERT INTO ai_not_primary VALUES ('b', 3), ('a', 9)",
 
-        // Numbers at the edges of their types.
+        // Numbers at the edges of their types, FLOAT in tables of its own
+        // (see `mysqldumpKeeps`).
         """
         CREATE TABLE numbers (
             id INT PRIMARY KEY, wide DECIMAL(65,30), money DECIMAL(20,6), negative DECIMAL(10,2),
             ubig BIGINT UNSIGNED, sbig BIGINT, small_unsigned SMALLINT UNSIGNED, tiny TINYINT,
-            flag BIT(1), mask BIT(64), f FLOAT, d DOUBLE, y YEAR
+            flag BIT(1), mask BIT(64), d DOUBLE, y YEAR
         )
         """,
         """
         INSERT INTO numbers VALUES
             (1, '12345678901234567890123456789012345.123456789012345678901234567890', '99999999999999.999999', -0.01,
              18446744073709551615, -9223372036854775808, 65535, -128,
-             b'1', b'1111111111111111111111111111111111111111111111111111111111111111', 1.2345678, 0.30000000000000004, 2155),
-            (2, 0, 0.000001, 0, 0, 9223372036854775807, 0, 127, b'0', b'1010', 16777216, 1.7976931348623157e308, 1901),
-            (3, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, -3.4e38, NULL, NULL),
-            (4, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL)
+             b'1', b'1111111111111111111111111111111111111111111111111111111111111111', 0.30000000000000004, 2155),
+            (2, 0, 0.000001, 0, 0, 9223372036854775807, 0, 127, b'0', b'1010', 1.7976931348623157e308, 1901),
+            (3, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
+            (4, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL)
         """,
+        "CREATE TABLE floats (id INT PRIMARY KEY, f FLOAT)",
+        "INSERT INTO floats VALUES (1, 1.2345678), (2, 16777216), (3, -3.4e38), (4, NULL)",
         "CREATE TABLE float_key (f FLOAT PRIMARY KEY)",
         "INSERT INTO float_key VALUES " + (1...20).map { "(\(Double($0) + 0.1234567))" }.joined(separator: ", "),
 
@@ -599,4 +748,62 @@ final class BackupRoundTripTests: XCTestCase {
         "CREATE TABLE a_uses_sequence (id INT NOT NULL DEFAULT NEXT VALUE FOR z_ids PRIMARY KEY, v INT)",
         "INSERT INTO a_uses_sequence (v) VALUES (1), (2)",
     ]
+}
+
+/// Every round trip above through the SSH test servers (testenv's `ssh`
+/// profile), to a MariaDB that only the SSH server can reach. The app
+/// connects to the tunnel's local end, and so do mysqldump and the mysql
+/// client.
+class SSHBackupRoundTripTests: BackupRoundTripTests {
+    private var tunnel: SSHTunnel?
+    private var sshFolder: URL?
+    private var localPort = 0
+
+    var ssh: SSHSettings? {
+        let environment = ProcessInfo.processInfo.environment
+        guard let port = environment["MYSQL_TEST_SSH_PORT"].flatMap(Int.init), let key = environment["MYSQL_TEST_SSH_KEY"] else { return nil }
+        return SSHSettings(host: "127.0.0.1", port: port, username: "tunnel", keyFile: key)
+    }
+
+    override func setUp() async throws {
+        guard let ssh else { throw XCTSkip("The SSH test servers aren't running (testenv/run-tests.sh starts them).") }
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        sshFolder = folder
+        let proxy = ssh.proxy.map {
+            HTTPProxyConnector.Proxy(host: $0.host, port: $0.port, username: $0.username, password: "proxy-test-password")
+        }
+        let tunnel = SSHTunnel(settings: ssh, proxy: proxy, sshFolder: folder)
+        localPort = try await tunnel.open(to: "private-mariadb", port: 3306)
+        self.tunnel = tunnel
+        try await super.setUp()
+    }
+
+    override func tearDown() async throws {
+        // Without a tunnel, setUp stopped before the base class set anything up.
+        if tunnel != nil { try await super.tearDown() }
+        tunnel?.close()
+        if let sshFolder { try? FileManager.default.removeItem(at: sshFolder) }
+    }
+
+    override func connect() async throws -> MySQLService {
+        let service = MySQLService()
+        try await service.connect(host: "127.0.0.1", port: localPort, username: "root", password: nil, database: nil,
+                                  serverName: "private-mariadb")
+        return service
+    }
+}
+
+/// The same, with the SSH server reached through the HTTP proxy that wants a
+/// login.
+final class ProxiedSSHBackupRoundTripTests: SSHBackupRoundTripTests {
+    override var ssh: SSHSettings? {
+        guard var settings = super.ssh,
+              let proxyPort = ProcessInfo.processInfo.environment["MYSQL_TEST_PROXY_PORT"].flatMap(Int.init) else { return nil }
+        // The SSH server by the name the proxy knows it by.
+        settings.host = "ssh"
+        settings.port = 22
+        settings.proxy = HTTPProxySettings(host: "127.0.0.1", port: proxyPort, username: "proxyuser")
+        return settings
+    }
 }

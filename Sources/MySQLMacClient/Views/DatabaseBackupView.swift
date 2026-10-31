@@ -20,11 +20,20 @@ struct DatabaseBackupView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             titleRow
-            databasePicker
+            HStack(alignment: .top, spacing: 24) {
+                databasePicker
+                enginePicker
+            }
 
             if viewModel.isLoadingObjects {
                 ProgressView("Loading objects…")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if viewModel.usesExternalTool {
+                VStack(alignment: .leading, spacing: 16) {
+                    externalToolCard
+                    saveToFileRow
+                }
+                .frame(maxHeight: .infinity, alignment: .top)
             } else {
                 HStack(alignment: .top, spacing: 16) {
                     objectsPanel
@@ -94,6 +103,53 @@ struct DatabaseBackupView: View {
             .labelsHidden()
             .frame(maxWidth: 320)
         }
+    }
+
+    // MARK: - Engine: built-in or mysqldump
+
+    private var enginePicker: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("ENGINE")
+                .font(.system(size: 11, weight: .semibold))
+                .tracking(0.6)
+                .foregroundStyle(theme.textSecondary)
+            Picker("", selection: $viewModel.usesExternalTool) {
+                Text("Built-in").tag(false)
+                Text(verbatim: viewModel.externalToolURL?.lastPathComponent ?? "mysqldump").tag(true)
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .frame(maxWidth: 240)
+            .disabled(viewModel.isRunning || !ExternalTool.isAvailable)
+            if !ExternalTool.isAvailable {
+                Text("The App Sandbox keeps this build from running command-line tools installed outside the app.")
+                    .font(.caption)
+                    .foregroundStyle(theme.textSecondary)
+            }
+        }
+    }
+
+    private var externalToolCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if let toolURL = viewModel.externalToolURL {
+                Text("\(toolURL.lastPathComponent) backs up the whole database: every table, view, routine, trigger and event, read from one consistent snapshot without locking tables.")
+                    .foregroundStyle(theme.textPrimary)
+                Text(verbatim: toolURL.path)
+                    .font(.system(size: 12, design: .monospaced))
+                    .foregroundStyle(theme.textSecondary)
+                    .textSelection(.enabled)
+                if viewModel.externalToolRoundsFloats {
+                    Text("\(toolURL.lastPathComponent) writes FLOAT values the way MariaDB prints them, to 6 significant digits, so this database's FLOAT columns can come back changed (16777216 as 16777200). The built-in engine keeps them exact.")
+                        .foregroundStyle(.orange)
+                }
+            } else {
+                Text("No mysqldump or mariadb-dump was found. Choose one in Settings ▸ General.")
+                    .foregroundStyle(.orange)
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .schemaCard(theme: theme)
     }
 
     // MARK: - Objects panel (scrollable, 4 categories)
@@ -338,9 +394,11 @@ struct DatabaseBackupView: View {
                 .foregroundStyle(theme.textSecondary)
             }
             HStack {
-                Text("\(viewModel.selectedObjectCount) objects ready · \(viewModel.options.mode.displayName)")
-                    .font(.callout)
-                    .foregroundStyle(theme.textSecondary)
+                if !viewModel.usesExternalTool {
+                    Text("\(viewModel.selectedObjectCount) objects ready · \(viewModel.options.mode.displayName)")
+                        .font(.callout)
+                        .foregroundStyle(theme.textSecondary)
+                }
                 Spacer()
                 Button("Close") {
                     if viewModel.isRunning { viewModel.cancelBackup() }
@@ -358,7 +416,8 @@ struct DatabaseBackupView: View {
                     }
                 }
                 .keyboardShortcut(.defaultAction)
-                .disabled(viewModel.isRunning || viewModel.outputFileURL == nil || viewModel.selectedObjectCount == 0)
+                .disabled(viewModel.isRunning || viewModel.outputFileURL == nil
+                          || (viewModel.usesExternalTool ? viewModel.externalToolURL == nil : viewModel.selectedObjectCount == 0))
                 .buttonStyle(SchemaPrimaryButtonStyle(theme: theme))
             }
         }
