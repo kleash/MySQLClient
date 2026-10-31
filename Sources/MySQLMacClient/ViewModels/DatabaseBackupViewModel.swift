@@ -831,9 +831,17 @@ final class DatabaseBackupViewModel: ObservableObject {
         if options.file.includeDropStatements {
             fileHandle.write(Data((SQLExporter.dropViewStatement(view: view.name) + "\n").utf8))
         }
-        let rawDDL = try await introspection.showCreateView(view.name, inDatabase: database.name)
-        let createSQL = SQLExporter.createViewStatement(rawShowCreateView: rawDDL)
-        fileHandle.write(Data((createSQL + "\n\n").utf8))
+        let definition = try await introspection.viewDefinition(view.name, inDatabase: database.name)
+        let createSQL = SQLExporter.createViewStatement(rawShowCreateView: definition.statement)
+        // Under the connection collation it was created under, as mysqldump
+        // does: its string literals take it ('a' = 'A' is true or false by
+        // it). Not the character set its text came in, since the file's is
+        // UTF-8 whatever that was.
+        let collation = SQLExporter.escapeStringLiteral(definition.collationConnection)
+        fileHandle.write(Data((
+            "SET @saved_collation_connection = @@COLLATION_CONNECTION, COLLATION_CONNECTION = '\(collation)';\n"
+                + createSQL + "\nSET COLLATION_CONNECTION = @saved_collation_connection;\n\n"
+        ).utf8))
     }
 
     private func dumpRoutine(_ routine: RoutineInfo, to fileHandle: FileHandle) async throws {

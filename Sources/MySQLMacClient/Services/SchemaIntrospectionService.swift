@@ -110,13 +110,19 @@ struct SchemaIntrospectionService {
     /// afterward to match what a `USE database; SHOW CREATE VIEW` would
     /// have produced.
     func showCreateView(_ view: String, inDatabase database: String) async throws -> String {
+        try await viewDefinition(view, inDatabase: database).statement
+    }
+
+    /// `showCreateView`, with the connection collation the view was created
+    /// under, which its string literals take.
+    func viewDefinition(_ view: String, inDatabase database: String) async throws -> (statement: String, collationConnection: String) {
         let qualifiedView = try Self.qualifiedIdentifier(database: database, name: view)
         let rows = try await service.query("SHOW CREATE VIEW \(qualifiedView)")
-        guard let raw = rows.first?.column("Create View")?.string else {
+        guard let row = rows.first, let raw = row.column("Create View")?.string else {
             throw MySQLServiceError.invalidIdentifier(view)
         }
         let qualifiedPrefix = "\(try Self.quotedIdentifier(database))."
-        return raw.replacingOccurrences(of: qualifiedPrefix, with: "")
+        return (raw.replacingOccurrences(of: qualifiedPrefix, with: ""), row.column("collation_connection")?.string ?? "")
     }
 
     /// The table's `CREATE TABLE` statement, exactly as MySQL would print it

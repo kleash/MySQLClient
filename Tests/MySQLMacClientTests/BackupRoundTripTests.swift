@@ -541,6 +541,11 @@ final class BackupRoundTripTests: XCTestCase {
         "CREATE TRIGGER latin1_trigger AFTER INSERT ON checked FOR EACH ROW SET @latin1_trigger = 1",
         "CREATE EVENT latin1_event ON SCHEDULE EVERY 1 DAY STARTS '2030-01-01 00:00:00' DISABLE DO SET @latin1_event = 1",
         "ALTER DATABASE CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci",
+        // A view created under a connection collation of its own, which its
+        // string literals take: 'a' = 'A' is false in it.
+        "SET NAMES utf8mb4 COLLATE utf8mb4_bin",
+        "CREATE VIEW binary_literals AS SELECT 'a' = 'A' AS same",
+        "SET NAMES utf8mb4",
     ]
 
     /// MariaDB-only, after `mariaDBCorpus`.
