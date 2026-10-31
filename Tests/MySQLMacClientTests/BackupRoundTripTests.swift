@@ -377,6 +377,11 @@ final class BackupRoundTripTests: XCTestCase {
         // (see testPagesOfACompositeKeyAreRangesOfItsIndex).
         "CREATE TABLE reversed_key (a INT, b INT, PRIMARY KEY (b, a))",
         "INSERT INTO reversed_key VALUES " + (0..<700).map { "(\($0 / 10), \($0 % 10))" }.joined(separator: ", "),
+        // No key, and values the collation calls equal but whose bytes
+        // differ: case, accents and trailing spaces.
+        "CREATE TABLE no_key_ties (v VARCHAR(10))",
+        "INSERT INTO no_key_ties VALUES " + [("a", 12), ("A", 11), ("á", 4), ("Á", 3), ("a ", 2)]
+            .flatMap { Array(repeating: "('\($0)')", count: $1) }.joined(separator: ", "),
 
         // ---- End of values and paging, continued ----
 

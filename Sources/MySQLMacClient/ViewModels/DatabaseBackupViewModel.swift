@@ -615,9 +615,12 @@ final class DatabaseBackupViewModel: ObservableObject {
     /// Ordering also makes paging *correct*, not just fast: `LIMIT` across
     /// separate queries has no row-order guarantee without an `ORDER BY`,
     /// so rows could otherwise repeat or vanish between pages. A table with
-    /// no primary key is ordered by every column, so only rows that are identical
-    /// (and so interchangeable) can trade places — the slow path, but such
-    /// tables are rare and typically small.
+    /// no primary key is ordered by the bytes of every column, so only rows
+    /// that are identical (and so interchangeable) can trade places — the
+    /// slow path, but such tables are rare and typically small. Not by the
+    /// columns themselves: their collation calls 'a', 'A', 'á' and 'a '
+    /// equal, and rows tied that way traded places between pages, so some
+    /// were written twice and others not at all.
     ///
     /// Columns are named rather than `SELECT *`, which leaves out
     /// invisible columns, and generated ones are skipped: the server
@@ -629,11 +632,12 @@ final class DatabaseBackupViewModel: ObservableObject {
         // FLOAT is read as DOUBLE: the server prints a FLOAT with only six
         // significant digits (16777216 as 16777200), while the DOUBLE holds
         // its exact value, which converts back to the very same FLOAT.
-        let selectList = columns.map { column in
+        let selectExpressions = columns.map { column in
             column.mysqlType.lowercased().hasPrefix("float")
                 ? "\(SQLExporter.quoted(column.name)) + 0e0"
                 : SQLExporter.quoted(column.name)
-        }.joined(separator: ", ")
+        }
+        let selectList = selectExpressions.joined(separator: ", ")
 
         // In the key's own order, not the table's, so ORDER BY walks its
         // index instead of sorting the table.
@@ -647,7 +651,14 @@ final class DatabaseBackupViewModel: ObservableObject {
         let canSeekByKey = !keyColumnNames.isEmpty && keyIndexes.count == keyColumnNames.count
             && !keyIndexes.contains { ["enum", "set", "bit"].contains(where: columns[$0].mysqlType.lowercased().hasPrefix) }
         let quotedKeys = keyColumnNames.map(SQLExporter.quoted)
-        let orderList = keyColumnNames.isEmpty ? selectList : quotedKeys.joined(separator: ", ")
+        // shortcut: a sort only looks at a value's first max_sort_length
+        // bytes (1024), so key-less rows whose long TEXT or BLOB values share
+        // those could still trade places on a server that doesn't keep ties in
+        // row order (MariaDB 10.4 does); order by a hash of such columns too
+        // if that turns up.
+        let orderList = keyColumnNames.isEmpty
+            ? selectExpressions.map { "CAST(\($0) AS BINARY)" }.joined(separator: ", ")
+            : quotedKeys.joined(separator: ", ")
 
         var lastKeyLiterals: [String]?
         var offset = 0
