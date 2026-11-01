@@ -32079,6 +32079,113 @@
         }
       }
     },
+    "Stopped at line %lld, where the file moves on to another database: restored into one, their tables would overwrite each other. To restore each into its own database, turn on \"Use the database named in the file\". The statements before it were restored.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "توقفت عند السطر %lld، حيث ينتقل الملف إلى قاعدة بيانات أخرى: إذا استُعيدت قواعد البيانات هذه إلى قاعدة واحدة، فستكتب جداولها فوق بعضها. لاستعادة كل منها إلى قاعدة بيانات خاصة بها، فعّل \"استخدام قاعدة البيانات المذكورة في الملف\". تمت استعادة العبارات التي قبل هذا السطر."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bei Zeile %lld angehalten, an der die Datei zu einer anderen Datenbank wechselt: In eine einzige Datenbank wiederhergestellt, würden sich die Tabellen der Datenbanken gegenseitig überschreiben. Um jede in ihre eigene Datenbank wiederherzustellen, aktivieren Sie „Die in der Datei genannte Datenbank verwenden“. Die Anweisungen vor dieser Zeile wurden wiederhergestellt."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Se detuvo en la línea %lld, donde el archivo pasa a otra base de datos: al restaurarlas en una sola, sus tablas se sobrescribirían entre sí. Para restaurar cada una en su propia base de datos, activa «Usar la base de datos indicada en el archivo». Las sentencias anteriores se restauraron."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Arrêt à la ligne %lld, où le fichier passe à une autre base de données : si elles étaient restaurées dans une seule, leurs tables s'écraseraient les unes les autres. Pour restaurer chacune dans sa propre base de données, activez « Utiliser la base de données nommée dans le fichier ». Les instructions précédentes ont été restaurées."
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "पंक्ति %lld पर रुका, जहाँ फ़ाइल दूसरे डेटाबेस पर चली जाती है: एक ही डेटाबेस में रीस्टोर करने पर उन डेटाबेस की टेबल एक-दूसरे को ओवरराइट कर देंगी। हर डेटाबेस को उसके अपने डेटाबेस में रीस्टोर करने के लिए \"फ़ाइल में बताए गए डेटाबेस का उपयोग करें\" चालू करें। उस पंक्ति से पहले के स्टेटमेंट रीस्टोर हो गए।"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Berhenti di baris %lld, tempat file berpindah ke database lain: jika semuanya dipulihkan ke satu database, tabel-tabelnya akan saling menimpa. Untuk memulihkan masing-masing ke database-nya sendiri, aktifkan \"Gunakan database yang disebut dalam file\". Pernyataan sebelumnya telah dipulihkan."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Interrotto alla riga %lld, dove il file passa a un altro database: se venissero ripristinati in uno solo, le loro tabelle si sovrascriverebbero a vicenda. Per ripristinare ciascuno nel proprio database, attiva \"Usa il database indicato nel file\". Le istruzioni precedenti sono state ripristinate."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 行目で止まりました。ファイルはこの行から別のデータベースに切り替わります。1 つのデータベースに復元すると、データベースごとのテーブルが互いに上書きされてしまいます。それぞれを別々のデータベースに復元するには、「ファイルに書かれたデータベースを使う」をオンにしてください。この行より前の文は復元されています。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld행에서 중지했습니다. 파일이 이 행에서 다른 데이터베이스로 넘어갑니다. 하나의 데이터베이스로 복원하면 각 데이터베이스의 테이블이 서로 덮어쓰게 됩니다. 각각을 별도의 데이터베이스로 복원하려면 \"파일에 지정된 데이터베이스 사용\"을 켜세요. 이 행 이전의 문은 복원되었습니다."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zatrzymano w wierszu %lld, w którym plik przechodzi do innej bazy danych: gdyby przywrócić je do jednej, ich tabele nadpisałyby się nawzajem. Aby przywrócić każdą z nich do własnej bazy danych, włącz „Użyj bazy danych wskazanej w pliku”. Wcześniejsze instrukcje zostały przywrócone."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Parou na linha %lld, onde o arquivo passa para outro banco de dados: se fossem restaurados em um só, as tabelas deles se sobrescreveriam umas às outras. Para restaurar cada um no seu próprio banco de dados, ative \"Usar o banco de dados indicado no arquivo\". As instruções anteriores foram restauradas."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Остановлено на строке %lld, где файл переходит к другой базе данных: при восстановлении в одну их таблицы перезаписали бы друг друга. Чтобы восстановить каждую в свою базу данных, включите «Использовать базу данных, указанную в файле». Операторы до этой строки восстановлены."
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "หยุดที่บรรทัด %lld ซึ่งเป็นจุดที่ไฟล์เปลี่ยนไปใช้ฐานข้อมูลอื่น หากกู้คืนลงในฐานข้อมูลเดียว ตารางของแต่ละฐานข้อมูลจะเขียนทับกัน หากต้องการกู้คืนแต่ละฐานข้อมูลลงในฐานข้อมูลของตัวเอง ให้เปิด \"ใช้ฐานข้อมูลที่ระบุในไฟล์\" คำสั่งก่อนบรรทัดนั้นถูกกู้คืนแล้ว"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dosyanın başka bir veritabanına geçtiği %lld. satırda duruldu: tek bir veritabanına geri yüklenirlerse tabloları birbirinin üzerine yazılır. Her birini kendi veritabanına geri yüklemek için “Dosyada adı geçen veritabanını kullan” seçeneğini açın. O satırdan önceki ifadeler geri yüklendi."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đã dừng ở dòng %lld, nơi tệp chuyển sang một cơ sở dữ liệu khác: nếu khôi phục vào cùng một cơ sở dữ liệu, các bảng của chúng sẽ ghi đè lên nhau. Để khôi phục từng cơ sở dữ liệu vào cơ sở dữ liệu riêng, hãy bật \"Dùng cơ sở dữ liệu ghi trong tệp\". Các câu lệnh trước đó đã được khôi phục."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在第 %lld 行停止，文件在此行切换到另一个数据库：如果恢复到同一个数据库，它们的表会相互覆盖。要将它们分别恢复到各自的数据库，请打开“使用文件中指定的数据库”。该行之前的语句已恢复。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在第 %lld 行停止，檔案在此行切換到另一個資料庫：如果還原到同一個資料庫，它們的表格會互相覆寫。若要將它們分別還原到各自的資料庫，請開啟「使用檔案中指定的資料庫」。該行之前的陳述式已還原。"
+          }
+        }
+      }
+    },
     "Stopped at line %lld. The statements before it were restored.": {
       "extractionState": "manual",
       "localizations": {
@@ -32182,6 +32289,113 @@
           "stringUnit": {
             "state": "translated",
             "value": "在第 %lld 行停止。之前的陳述式已還原。"
+          }
+        }
+      }
+    },
+    "Stopped at line %lld: the statement there is 16 MB or larger, more than this restore can send to the server. The statements before it were restored; to restore the whole file, use the mysql client.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "توقفت عند السطر %lld: حجم العبارة فيه 16 MB أو أكثر، وهذا أكبر مما يمكن لهذه الاستعادة إرساله إلى الخادم. تمت استعادة العبارات التي قبل هذا السطر؛ لاستعادة الملف كاملًا، استخدم عميل mysql."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bei Zeile %lld angehalten: Die Anweisung dort ist mindestens 16 MB groß und damit größer, als diese Wiederherstellung an den Server senden kann. Die Anweisungen davor wurden wiederhergestellt; um die ganze Datei wiederherzustellen, verwenden Sie den mysql-Client."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Se detuvo en la línea %lld: la sentencia de esa línea ocupa al menos 16 MB, más de lo que esta restauración puede enviar al servidor. Las sentencias anteriores se restauraron; para restaurar el archivo completo, usa el cliente mysql."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Arrêt à la ligne %lld : l'instruction qui s'y trouve fait au moins 16 MB, plus que ce que cette restauration peut envoyer au serveur. Les instructions précédentes ont été restaurées ; pour restaurer tout le fichier, utilisez le client mysql."
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "पंक्ति %lld पर रुका: वहाँ का स्टेटमेंट 16 MB या उससे बड़ा है, जो इस रीस्टोर की सर्वर पर भेजने की सीमा से ज़्यादा है। उससे पहले के स्टेटमेंट रीस्टोर हो गए; पूरी फ़ाइल रीस्टोर करने के लिए mysql क्लाइंट का उपयोग करें।"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Berhenti di baris %lld: pernyataan di baris itu berukuran 16 MB atau lebih, melebihi batas yang bisa dikirim pemulihan ini ke server. Pernyataan sebelumnya telah dipulihkan; untuk memulihkan seluruh file, gunakan klien mysql."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Interrotto alla riga %lld: l'istruzione in quella riga occupa almeno 16 MB, più di quanto questo ripristino possa inviare al server. Le istruzioni precedenti sono state ripristinate; per ripristinare l'intero file, usa il client mysql."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 行目で止まりました。この行の文は 16 MB 以上あり、この復元でサーバーに送れる大きさを超えています。それより前の文は復元されています。ファイル全体を復元するには、mysql クライアントを使ってください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld행에서 중지했습니다. 이 행의 문은 16 MB 이상으로, 이 복원이 서버에 보낼 수 있는 크기를 넘습니다. 그 이전의 문은 복원되었습니다. 파일 전체를 복원하려면 mysql 클라이언트를 사용하세요."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zatrzymano w wierszu %lld: instrukcja w tym wierszu ma co najmniej 16 MB, czyli więcej, niż to przywracanie może wysłać do serwera. Wcześniejsze instrukcje zostały przywrócone; aby przywrócić cały plik, użyj klienta mysql."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Parou na linha %lld: a instrução dessa linha tem pelo menos 16 MB, mais do que esta restauração consegue enviar ao servidor. As instruções anteriores foram restauradas; para restaurar o arquivo inteiro, use o cliente mysql."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Остановлено на строке %lld: оператор в этой строке занимает не меньше 16 MB — больше, чем может отправить на сервер это восстановление. Операторы до неё восстановлены; чтобы восстановить весь файл, используйте клиент mysql."
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "หยุดที่บรรทัด %lld เนื่องจากคำสั่งในบรรทัดนั้นมีขนาด 16 MB ขึ้นไป ซึ่งเกินกว่าที่การกู้คืนนี้จะส่งไปยังเซิร์ฟเวอร์ได้ คำสั่งก่อนหน้านั้นถูกกู้คืนแล้ว หากต้องการกู้คืนทั้งไฟล์ ให้ใช้ไคลเอนต์ mysql"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld. satırda duruldu: oradaki ifade 16 MB veya daha büyük, yani bu geri yüklemenin sunucuya gönderebileceğinden fazla. Ondan önceki ifadeler geri yüklendi; dosyanın tamamını geri yüklemek için mysql istemcisini kullanın."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đã dừng ở dòng %lld: câu lệnh ở dòng đó có kích thước từ 16 MB trở lên, vượt quá mức mà cách khôi phục này có thể gửi đến máy chủ. Các câu lệnh trước đó đã được khôi phục; để khôi phục toàn bộ tệp, hãy dùng trình khách mysql."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在第 %lld 行停止：该行的语句达到或超过 16 MB，超出了此恢复功能可发送到服务器的上限。此前的语句已恢复；如需恢复整个文件，请使用 mysql 客户端。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在第 %lld 行停止：該行的陳述式達到或超過 16 MB，超出了此還原功能可傳送到伺服器的上限。之前的陳述式已還原；若要還原整個檔案，請使用 mysql 用戶端。"
           }
         }
       }
