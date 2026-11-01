@@ -22864,6 +22864,113 @@
         }
       }
     },
+    "Not InnoDB, so \"Single transaction\" can't read them from one snapshot (\"Lock tables for reading\" can): %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "هذه الجداول ليست InnoDB، لذا لا يستطيع خيار \"معاملة واحدة (single transaction)\" قراءتها من لقطة واحدة (أما \"قفل الجداول للقراءة\" فيستطيع): %@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diese Tabellen verwenden nicht InnoDB, daher kann „Einzeltransaktion (single transaction)“ sie nicht aus einem einzigen Snapshot lesen („Tabellen zum Lesen sperren“ kann das): %@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Estas tablas no son InnoDB, así que «Transacción única (single transaction)» no puede leerlas de una sola instantánea («Bloquear tablas para lectura» sí puede): %@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ces tables n'utilisent pas InnoDB, donc « Transaction unique (single transaction) » ne peut pas les lire depuis un seul instantané (« Verrouiller les tables en lecture » le peut) : %@"
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ये टेबल InnoDB नहीं हैं, इसलिए \"एकल ट्रांज़ैक्शन (single transaction)\" इन्हें एक ही स्नैपशॉट से नहीं पढ़ सकता (\"पढ़ने के लिए टेबल लॉक करें\" पढ़ सकता है): %@"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tabel berikut bukan InnoDB, jadi \"Transaksi tunggal\" tidak bisa membacanya dari satu snapshot (\"Kunci tabel untuk pembacaan\" bisa): %@"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Queste tabelle non sono InnoDB, quindi \"Transazione singola (single transaction)\" non può leggerle da un unico snapshot (\"Blocca tabelle per la lettura\" può farlo): %@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "これらのテーブルは InnoDB ではないため、「単一トランザクション (single transaction)」では 1 つのスナップショットから読み込めません（「テーブルを読み取り用にロックする」なら読み込めます）: %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "다음 테이블은 InnoDB가 아니어서 \"단일 트랜잭션 (single transaction)\"으로는 하나의 스냅샷에서 읽을 수 없습니다(\"읽기용으로 테이블 잠금\"으로는 읽을 수 있습니다): %@"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Te tabele nie używają InnoDB, więc „Jedna transakcja (single transaction)” nie może odczytać ich z jednej migawki („Blokuj tabele do odczytu” może): %@"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Estas tabelas não são InnoDB, então \"Transação única (single transaction)\" não consegue lê-las de um único snapshot (\"Bloquear tabelas para leitura\" consegue): %@"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Эти таблицы не используют InnoDB, поэтому «Одна транзакция (single transaction)» не может прочитать их из одного снимка («Блокировать таблицы для чтения» может): %@"
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ตารางต่อไปนี้ไม่ได้ใช้ InnoDB ดังนั้น \"ธุรกรรมเดียว\" จึงอ่านตารางเหล่านี้จากสแนปช็อตเดียวไม่ได้ (\"ล็อกตารางสำหรับการอ่าน\" อ่านได้): %@"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu tablolar InnoDB değil, bu yüzden “Tek işlem (single transaction)” onları tek bir anlık görüntüden okuyamaz (“Okuma için tabloları kilitle” okuyabilir): %@"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Các bảng sau không dùng InnoDB, nên \"Giao dịch đơn\" không thể đọc chúng từ cùng một ảnh chụp (\"Khóa bảng để đọc\" thì đọc được): %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这些表不是 InnoDB 表，因此“单一事务 (single transaction)”无法从同一个快照中读取它们（“锁定表以供读取”可以）：%@"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "這些表格不是 InnoDB 表格，因此「單一交易 (single transaction)」無法從同一個快照讀取它們（「鎖定表格以供讀取」可以）：%@"
+          }
+        }
+      }
+    },
     "Not connected to a database.": {
       "extractionState": "manual",
       "localizations": {
