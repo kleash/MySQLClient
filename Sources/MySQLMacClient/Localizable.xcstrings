@@ -17297,6 +17297,113 @@
         }
       }
     },
+    "For an exact copy, use the built-in engine: %@ doesn't reproduce everything, such as dates that don't exist, -0 or an empty ENUM or SET member.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "للحصول على نسخة مطابقة تمامًا، استخدم المحرك المدمج: لا يعيد %@ إنتاج كل شيء كما هو، مثل التواريخ غير الموجودة و‎-0 والعنصر الفارغ في ENUM أو SET."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Für eine exakte Kopie verwenden Sie die integrierte Engine: %@ reproduziert nicht alles, etwa nicht existierende Datumswerte, -0 oder ein leeres ENUM- oder SET-Element."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Para una copia exacta, usa el motor integrado: %@ no lo reproduce todo, como las fechas que no existen, -0 o un miembro vacío de ENUM o SET."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pour une copie exacte, utilisez le moteur intégré : %@ ne reproduit pas tout, comme les dates qui n'existent pas, -0 ou un membre vide d'un ENUM ou d'un SET."
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "सटीक कॉपी के लिए बिल्ट-इन इंजन का उपयोग करें: %@ हर चीज़ को हूबहू नहीं दोहराता, जैसे अस्तित्वहीन तारीखें, -0 या ENUM या SET का खाली सदस्य।"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Untuk salinan yang persis sama, gunakan mesin bawaan: %@ tidak mereproduksi semuanya, seperti tanggal yang tidak ada, -0, atau anggota ENUM atau SET yang kosong."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Per una copia esatta, usa il motore integrato: %@ non riproduce tutto, ad esempio le date che non esistono, -0 o un membro vuoto di ENUM o SET."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正確なコピーには内蔵エンジンを使用してください。%@ は、存在しない日付、-0、ENUM や SET の空のメンバーなど、一部の値を再現しません。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "정확한 복사본이 필요하면 내장 엔진을 사용하세요. %@은(는) 존재하지 않는 날짜, -0, ENUM 또는 SET의 빈 멤버 등 일부 값을 그대로 재현하지 않습니다."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aby uzyskać dokładną kopię, użyj wbudowanego silnika: %@ nie odtwarza wszystkiego, na przykład nieistniejących dat, -0 ani pustego elementu ENUM lub SET."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Para uma cópia exata, use o mecanismo integrado: %@ não reproduz tudo, como datas que não existem, -0 ou um membro vazio de ENUM ou SET."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Для точной копии используйте встроенный механизм: %@ воспроизводит не всё, например несуществующие даты, -0 или пустой элемент ENUM или SET."
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "หากต้องการสำเนาที่ตรงทุกประการ ให้ใช้เอนจินในตัว เพราะ %@ ไม่ได้คงทุกอย่างไว้ตรงตามเดิม เช่น วันที่ที่ไม่มีอยู่จริง -0 หรือสมาชิกที่ว่างของ ENUM หรือ SET"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Birebir kopya için yerleşik motoru kullanın: %@ her şeyi aynen aktarmaz; var olmayan tarihler, -0 ya da boş bir ENUM veya SET üyesi buna örnektir."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Để có bản sao chính xác, hãy dùng công cụ tích hợp sẵn: %@ không tái tạo đúng mọi thứ, chẳng hạn như những ngày không tồn tại, -0 hoặc phần tử rỗng của ENUM hoặc SET."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "如需精确副本，请使用内置引擎：%@ 并不能原样重现所有内容，例如不存在的日期、-0、ENUM 或 SET 的空成员。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "如需精確副本，請使用內建引擎：%@ 並不能原樣重現所有內容，例如不存在的日期、-0、ENUM 或 SET 的空成員。"
+          }
+        }
+      }
+    },
     "Function": {
       "extractionState": "manual",
       "localizations": {
