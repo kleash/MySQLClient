@@ -279,7 +279,9 @@ struct ExternalTool: Sendable {
                         onErrorLine?(text)
                         if !text.hasPrefix("-- "), messages.count < 100 { messages.append(text) }
                     }
-                    while let data = try? errors.fileHandleForReading.read(upToCount: 65536), !data.isEmpty {
+                    // What has come so far, as `pass` reads: `read(upToCount:)`
+                    // would wait for all of the count, and --verbose's progress with it.
+                    while case let data = errors.fileHandleForReading.availableData, !data.isEmpty {
                         unfinished.append(data)
                         while let end = unfinished.firstIndex(of: UInt8(ascii: "\n")) {
                             take(unfinished[unfinished.startIndex..<end])
