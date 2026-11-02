@@ -55,14 +55,16 @@ struct ExternalTool: Sendable {
 
     // MARK: - Finding the tool
 
-    /// Where the tools usually are, MySQL's before MariaDB's: Homebrew on
-    /// Apple silicon and on Intel (mysql-client isn't linked into bin, it
-    /// has a folder of its own), Oracle's installer, MySQL Workbench, and
-    /// XAMPP (MariaDB's).
+    /// Where the tools usually are: Homebrew on Apple silicon and on Intel
+    /// (mysql-client isn't linked into bin, it has a folder of its own),
+    /// Oracle's installer, MySQL Workbench, and XAMPP (MariaDB's). The
+    /// folders that only MySQL's tools are in come first: Homebrew's
+    /// mariadb also names its tools mysqldump and mysql, in its folder and
+    /// in bin.
     private static let searchPaths = [
-        "/opt/homebrew/opt/mysql-client/bin", "/opt/homebrew/opt/mysql/bin", "/opt/homebrew/opt/mariadb/bin", "/opt/homebrew/bin",
-        "/usr/local/opt/mysql-client/bin", "/usr/local/opt/mysql/bin", "/usr/local/opt/mariadb/bin", "/usr/local/bin",
-        "/usr/local/mysql/bin", "/Applications/MySQLWorkbench.app/Contents/MacOS", "/Applications/XAMPP/xamppfiles/bin",
+        "/opt/homebrew/opt/mysql-client/bin", "/opt/homebrew/opt/mysql/bin", "/usr/local/opt/mysql-client/bin", "/usr/local/opt/mysql/bin",
+        "/usr/local/mysql/bin", "/Applications/MySQLWorkbench.app/Contents/MacOS",
+        "/opt/homebrew/opt/mariadb/bin", "/opt/homebrew/bin", "/usr/local/opt/mariadb/bin", "/usr/local/bin", "/Applications/XAMPP/xamppfiles/bin",
     ]
 
     /// The tool at `configuredPath` (Settings), or else the first one found:
