@@ -1,4 +1,5 @@
 import XCTest
+import MySQLNIO
 @testable import MySQLMacClient
 
 /// Regression coverage for a real bug found while manually testing against
@@ -59,6 +60,30 @@ final class MySQLServiceReconnectTests: XCTestCase {
 
         let isConnected = await service.isConnected
         XCTAssertTrue(isConnected)
+    }
+
+    /// Through an SSH tunnel whose ssh isn't holding the port (this one was
+    /// never opened), whatever is listening there would get the login: a
+    /// dropped connection isn't opened again.
+    func testDoesNotReconnectThroughATunnelThatIsDown() async throws {
+        await service.setTunnel(SSHTunnel(settings: SSHSettings(host: "ssh.invalid", username: ""), proxy: nil, sshFolder: nil))
+        let connectionID = try await service.query("SELECT CONNECTION_ID() AS id").first?.column("id")?.int
+        let killer = MySQLService()
+        try await killer.connect(host: TestDatabase.host, port: TestDatabase.port, username: TestDatabase.username, password: TestDatabase.password, database: nil)
+        try await killer.execute("KILL \(try XCTUnwrap(connectionID))")
+        try await killer.disconnect()
+        try await Task.sleep(nanoseconds: 300_000_000)
+
+        do {
+            _ = try await service.query("SELECT 1")
+            XCTFail("reconnected through a tunnel that is down")
+        } catch MySQLError.closed {}
+        // Nor a backup's or restore's own connection, with the same login.
+        do {
+            let separate = try await service.openSeparateConnection()
+            try? await separate.disconnect()
+            XCTFail("opened a separate connection through a tunnel that is down")
+        } catch MySQLError.closed {}
     }
 
     /// A connection closed before the server's greeting (as an SSH server

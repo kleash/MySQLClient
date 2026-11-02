@@ -141,6 +141,7 @@ final class ConnectionFormViewModel: ObservableObject {
                 tunnel = opened
                 connectPort = try await opened.open(to: host, port: portNumber)
                 connectHost = "127.0.0.1"
+                await service.setTunnel(opened)
             }
             try await service.connect(
                 host: connectHost,

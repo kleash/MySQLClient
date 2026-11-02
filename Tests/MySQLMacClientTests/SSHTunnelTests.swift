@@ -128,27 +128,44 @@ final class SSHTunnelTests: XCTestCase {
         }
     }
 
-    /// ssh dies (the network dropped): the tunnel starts it again on the
-    /// same port, and the next query reconnects through it.
+    /// ssh dies (the network dropped): a query meanwhile fails, and once the
+    /// tunnel has started ssh again on the same port, the next one
+    /// reconnects through it.
     func testComesBackAfterSSHEnds() async throws {
         let service = try await connect(direct)
+        let tunnel = try XCTUnwrap(tunnel)
         try killSSH()
+        let ended = Date().addingTimeInterval(5)
+        while tunnel.isForwarding, Date() < ended { try await Task.sleep(for: .milliseconds(10)) }
+        do {
+            _ = try await service.textQuery("SELECT 1")
+            XCTFail("a query got through while ssh was down")
+        } catch {}
         try await Task.sleep(for: .seconds(3))
         try await assertReachesThePrivateDatabase(service)
+        XCTAssertTrue(tunnel.isForwarding)
     }
 
     /// ssh can't come back (here the server's host key no longer matches):
     /// the tunnel stops starting it once its restarts have all failed (three
-    /// short ones here), and keeps ssh's reason.
+    /// short ones here), and a query on it gets ssh's reason rather than a
+    /// connection error.
     func testStopsStartingSSHAgainWhenItKeepsFailing() async throws {
-        _ = try await connect(direct, restartDelays: [0.5, 0.5, 0.5])
+        let service = try await connect(direct, restartDelays: [0.5, 0.5, 0.5])
         let tunnel = try XCTUnwrap(tunnel)
+        await service.setTunnel(tunnel)
         try rememberAnotherHostKey()
         try killSSH()
         let givenUp = Date().addingTimeInterval(30)
         while tunnel.lastFailure == nil, Date() < givenUp { try await Task.sleep(for: .milliseconds(100)) }
         let reason = try XCTUnwrap(tunnel.lastFailure, "still starting ssh again").message
         XCTAssertTrue(reason.contains("Host key verification failed"), reason)
+        do {
+            _ = try await service.textQuery("SELECT 1")
+            XCTFail("a query got through a tunnel that is down")
+        } catch let failure as SSHTunnel.Failure {
+            XCTAssertEqual(failure.message, reason)
+        }
     }
 
     /// The connection form opens the tunnel, logs in through it, and saves

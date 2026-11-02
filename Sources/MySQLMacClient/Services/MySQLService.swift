@@ -84,6 +84,15 @@ actor MySQLService {
     /// drop has to end the job rather than carry on somewhere else.
     private var reconnectsAutomatically = true
 
+    /// The SSH tunnel the connection goes through, if any. While its ssh
+    /// isn't holding the forwarded port, whatever else is listening there
+    /// would get the login, so nothing connects until it is again.
+    private var tunnel: SSHTunnel?
+
+    func setTunnel(_ tunnel: SSHTunnel?) {
+        self.tunnel = tunnel
+    }
+
     /// Whatever `SELECT VERSION()` returned on connect — e.g.
     /// `"10.4.32-MariaDB"` or `"8.0.45"`. Read once per connection rather
     /// than per use: it can't change under a live connection, and error
@@ -100,9 +109,7 @@ actor MySQLService {
     /// (an SSH tunnel's local end).
     func connect(host: String, port: Int, username: String, password: String?, database: String?, tls: TLSMode? = nil,
                  serverName: String? = nil) async throws {
-        if connection != nil {
-            try await disconnect()
-        }
+        if let tunnel, !tunnel.isForwarding { throw tunnel.lastFailure ?? MySQLError.closed }
 
         let group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
         let eventLoop = group.next()
@@ -142,6 +149,11 @@ actor MySQLService {
                 try? await conn.close().get()
                 throw error
             }
+            // Only now: a reconnect that fails keeps the credentials (and the
+            // dead connection), so the next query tries again.
+            if connection != nil {
+                try await disconnect()
+            }
             self.eventLoopGroup = group
             self.connection = conn
             self.isConnected = true
@@ -169,6 +181,7 @@ actor MySQLService {
     func openSeparateConnection() async throws -> MySQLService {
         guard let credentials = lastCredentials else { throw MySQLServiceError.notConnected }
         let separate = MySQLService()
+        await separate.setTunnel(tunnel)
         try await separate.connect(
             host: credentials.host,
             port: credentials.port,
