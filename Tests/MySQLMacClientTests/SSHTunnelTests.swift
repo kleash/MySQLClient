@@ -13,7 +13,7 @@ final class SSHTunnelTests: XCTestCase {
     private var service: MySQLService?
 
     override func setUp() async throws {
-        guard environment["MYSQL_TEST_SSH_PORT"] != nil else {
+        guard ["MYSQL_TEST_SSH_PORT", "MYSQL_TEST_SSH_KEY", "MYSQL_TEST_PROXY_PORT"].allSatisfy({ environment[$0] != nil }) else {
             throw XCTSkip("The SSH test servers aren't running (testenv/run-tests.sh starts them).")
         }
         sshFolder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
@@ -145,9 +145,10 @@ final class SSHTunnelTests: XCTestCase {
         XCTAssertEqual(rows.first?.column("two")?.string, "2")
         XCTAssertEqual(store.connections.first?.ssh, behindProxy)
     }
+}
 
-    // MARK: - Pure
-
+/// The parts that need no server.
+final class SSHTunnelArgumentTests: XCTestCase {
     func testArgumentsKeepTheHostFromBeingReadAsAnOption() {
         let arguments = SSHTunnel.arguments(
             settings: SSHSettings(host: "-oProxyCommand=touch /tmp/pwned", port: 22, username: "u", keyFile: "/keys/100%.pem"),
