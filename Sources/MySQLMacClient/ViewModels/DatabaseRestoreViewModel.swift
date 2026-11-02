@@ -348,6 +348,13 @@ final class DatabaseRestoreViewModel: ObservableObject {
     /// gets the bytes read and statements sent, every megabyte and at the
     /// end.
     ///
+    /// The client splits at a delimiter of the app's own, set before the
+    /// file starts: each statement the scan finds goes to it ended by that
+    /// token, and of what's between statements only the line breaks, so it
+    /// never sees the file's DELIMITER lines. Following those, the client
+    /// had read `DELIMITER ;` in a file with Windows line breaks as ";\r",
+    /// and split a question at a file's `DELIMITER @@`.
+    ///
     /// The file is split the way the client's session reads backslashes,
     /// as `performRestore` splits it: the client is asked when it starts and
     /// after each statement that mentions sql_mode, by a SELECT whose answer
@@ -387,14 +394,22 @@ final class DatabaseRestoreViewModel: ObservableObject {
             }
             answered.signal()  // The client has ended, and won't answer.
         }
+        // 15 bytes, the longest delimiter the client takes.
+        let token = UUID().uuidString.filter(\.isHexDigit).prefix(15)
         func noBackslashEscapes(after state: DelimiterScript.ScanState) throws -> Bool {
+            // The first question sets the delimiter, on the line the others
+            // leave empty.
+            let lead = questionLines.value.isEmpty ? "DELIMITER \(token)\n" : "\n"
             questionLines.value.append(state.line + 1 + 2 * questionLines.value.count)
             answer.value = nil
-            let question = "\nSELECT CONCAT('\(marker)', FIND_IN_SET('NO_BACKSLASH_ESCAPES', @@SESSION.sql_mode) > 0)"
-            try input.write(contentsOf: Array(question.utf8) + state.delimiter + Array("\n".utf8))
+            let question = lead + "SELECT CONCAT('\(marker)', FIND_IN_SET('NO_BACKSLASH_ESCAPES', @@SESSION.sql_mode) > 0)\(token)\n"
+            try input.write(contentsOf: Array(question.utf8))
             answered.wait()
             guard let value = answer.value else { throw POSIXError(.EPIPE) }
             return value
+        }
+        func lineBreaks(in bytes: ArraySlice<UInt8>) -> [UInt8] {
+            Array(repeating: UInt8(ascii: "\n"), count: bytes.count { $0 == UInt8(ascii: "\n") })
         }
 
         var pending: [UInt8] = []
@@ -415,7 +430,14 @@ final class DatabaseRestoreViewModel: ObservableObject {
                 sent.bytesRead += Int64(chunk.count)
             }
             let scanned = DelimiterScript.scan(pending, from: state, isFinal: reachedEnd, stopsAfterSQLMode: true)
-            try input.write(contentsOf: pending[..<scanned.consumed])
+            var whole: [UInt8] = []
+            var copied = 0
+            for statement in scanned.statements {
+                whole += lineBreaks(in: pending[copied..<statement.range.lowerBound]) + pending[statement.range] + Array(token.utf8)
+                copied = statement.range.upperBound
+            }
+            whole += lineBreaks(in: pending[copied..<scanned.consumed])
+            try input.write(contentsOf: whole)
             asked = scanned.statements.last.map { DelimiterScript.mentionsSQLMode(pending[$0.range]) } ?? false
             pending.removeFirst(scanned.consumed)
             state = scanned.state

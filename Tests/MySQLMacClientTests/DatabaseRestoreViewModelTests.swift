@@ -570,4 +570,45 @@ final class DatabaseRestoreViewModelTests: XCTestCase {
         let restored = try await ids(in: "t")
         XCTAssertEqual(restored, [1])
     }
+
+    /// A trigger as HeidiSQL exports it, with Windows line breaks: the client
+    /// read the file's `DELIMITER ;` as ";\r", the scan as ";", so the
+    /// question after the next statement never ended for the client, and
+    /// the restore waited for its answer forever.
+    func testMysqlClientRestoresATriggerWithWindowsLineBreaks() async throws {
+        let viewModel = try await restoreWithTheMysqlClient(Data("""
+            CREATE TABLE t (id INT PRIMARY KEY);
+            SET @OLDTMP_SQL_MODE=@@SQL_MODE, SQL_MODE='STRICT_TRANS_TABLES';
+            DELIMITER //
+            CREATE TRIGGER t_bi BEFORE INSERT ON t FOR EACH ROW BEGIN
+            \tSET NEW.id = NEW.id + 1;
+            END//
+            DELIMITER ;
+            SET SQL_MODE=@OLDTMP_SQL_MODE;
+            INSERT INTO t VALUES (1);
+
+            """.replacingOccurrences(of: "\n", with: "\r\n").utf8))
+
+        XCTAssertNil(viewModel.errorMessage)
+        XCTAssertTrue(viewModel.didFinishSuccessfully)
+        let restored = try await ids(in: "t")
+        XCTAssertEqual(restored, [2], "the trigger must have run")
+    }
+
+    /// The last statement has no delimiter and mentions sql_mode: the
+    /// question went to the client while that statement was still open, and
+    /// carrying on past errors, the restore waited for an answer that never
+    /// came.
+    func testMysqlClientRestoresAFileEndingInAStatementWithoutADelimiter() async throws {
+        let viewModel = try await restoreWithTheMysqlClient(Data("""
+            CREATE TABLE t (id INT PRIMARY KEY);
+            INSERT INTO t VALUES (1);
+            SET SESSION sql_mode = 'STRICT_TRANS_TABLES'
+            """.utf8)) { $0.stopOnFirstError = false }
+
+        XCTAssertNil(viewModel.errorMessage)
+        XCTAssertTrue(viewModel.didFinishSuccessfully)
+        let restored = try await ids(in: "t")
+        XCTAssertEqual(restored, [1])
+    }
 }
