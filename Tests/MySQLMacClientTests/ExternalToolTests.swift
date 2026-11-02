@@ -13,7 +13,6 @@ final class ExternalToolTests: XCTestCase {
     private let mysqldump = ExternalTool(
         url: URL(fileURLWithPath: "/opt/homebrew/opt/mysql-client/bin/mysqldump"),
         help: """
-            --no-login-paths        Don't read login paths from the login path file.
               -y, --no-tablespaces
               --column-statistics Add an ANALYZE TABLE statement to regenerate any existing
               -E, --events        Dump events.
@@ -78,7 +77,7 @@ final class ExternalToolTests: XCTestCase {
 
         for option in ["--single-transaction", "--skip-lock-tables", "--routines", "--events", "--triggers", "--hex-blob",
                        "--default-character-set=utf8mb4", "--set-gtid-purged=OFF", "--no-tablespaces", "--column-statistics=0",
-                       "--no-login-paths", "--protocol=TCP", "--host=db.example.com", "--port=3307", "--user=backup"] {
+                       "--protocol=TCP", "--host=db.example.com", "--port=3307", "--user=backup"] {
             XCTAssertTrue(arguments.contains(option), option)
         }
         XCTAssertFalse(arguments.contains("--lock-tables"))
@@ -92,7 +91,7 @@ final class ExternalToolTests: XCTestCase {
 
         XCTAssertTrue(arguments.contains("--no-tablespaces"))
         XCTAssertTrue(arguments.contains("--single-transaction"))
-        for option in ["--set-gtid-purged=OFF", "--column-statistics=0", "--no-login-paths"] {
+        for option in ["--set-gtid-purged=OFF", "--column-statistics=0"] {
             XCTAssertFalse(arguments.contains(option), option)
         }
     }
@@ -145,6 +144,38 @@ final class ExternalToolTests: XCTestCase {
         XCTAssertEqual(ExternalTool.optionFile(password: " a\"b\\c#d'e=f é\n\\"), "[client]\npassword=\" a\\\"b\\\\c#d'e=f é\\n\\\\\"\n")
         XCTAssertEqual(ExternalTool.optionFile(password: nil), "[client]\n")
         XCTAssertEqual(ExternalTool.optionFile(password: ""), "[client]\n")
+    }
+
+    // MARK: - Running
+
+    /// A shell script in place of a tool, in a folder of its own.
+    private func fakeTool(_ script: String) throws -> ExternalTool {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        addTeardownBlock { try? FileManager.default.removeItem(at: folder) }
+        let url = folder.appendingPathComponent("mysql")
+        try ("#!/bin/sh\n" + script).write(to: url, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: url.path)
+        return ExternalTool(url: url, help: "")
+    }
+
+    /// MySQL 8.0's tools have no --no-login-paths and read ~/.mylogin.cnf
+    /// after the option file, so a password saved there with
+    /// mysql_config_editor replaced the connection's, and went to this
+    /// server. The tool is given a login file that isn't there, in its own
+    /// private folder.
+    func testTheToolReadsNoLoginPathFile() async throws {
+        let tool = try fakeTool("""
+            login="$MYSQL_TEST_LOGIN_FILE"
+            options="${1#--defaults-file=}"
+            if [ -n "$login" ] && [ ! -e "$login" ] && [ "$(dirname "$login")" = "$(dirname "$options")" ]; then
+                echo ok >&2
+            else
+                echo "login file: '$login'" >&2
+            fi
+            """)
+        let said = try await tool.run([], optionFile: ExternalTool.optionFile(password: nil))
+        XCTAssertEqual(said, "ok")
     }
 
     // MARK: - Installed tools

@@ -120,20 +120,17 @@ struct ExternalTool: Sendable {
 
     // MARK: - Arguments
 
-    /// Where and how to connect. On the command line rather than in the
-    /// option file, where a host or user in MySQL's `.mylogin.cnf` (read
-    /// after every option file) would win over them.
+    /// Where and how to connect, on the command line, which wins over any
+    /// option file.
     func connectionArguments(_ connection: Connection) throws -> [String] {
-        var arguments = supports("no-login-paths") ? ["--no-login-paths"] : []
-        arguments += [
+        [
             // A host of "localhost" would otherwise mean the Unix socket.
             "--protocol=TCP",
             "--host=\(connection.host)",
             "--port=\(connection.port)",
             "--user=\(connection.username)",
             "--default-character-set=utf8mb4",
-        ]
-        return arguments + (try tlsArguments(connection))
+        ] + (try tlsArguments(connection))
     }
 
     /// The connection's encryption in the tool's own options, or a refusal
@@ -213,9 +210,10 @@ struct ExternalTool: Sendable {
     // MARK: - Running
 
     /// Runs the tool with `optionFile` as the only option file it reads (so
-    /// nothing in the user's own ~/.my.cnf can change what's dumped or where
-    /// it goes), in a folder of its own only this user can open, deleted
-    /// once the tool has ended — also when it failed or was cancelled.
+    /// nothing in the user's own ~/.my.cnf or ~/.mylogin.cnf can change
+    /// what's dumped or where it goes), in a folder of its own only this
+    /// user can open, deleted once the tool has ended — also when it failed
+    /// or was cancelled.
     /// Cancelling the task stops the tool.
     ///
     /// `input` writes what the tool reads, on a thread of its own started
@@ -236,6 +234,9 @@ struct ExternalTool: Sendable {
         let process = Process()
         process.executableURL = url
         process.arguments = ["--defaults-file=\(optionFileURL.path)"] + arguments
+        // MySQL's tools read ~/.mylogin.cnf after the option file, and 8.0's
+        // can't be told not to: its documented override names one that isn't there.
+        process.environment = ProcessInfo.processInfo.environment.merging(["MYSQL_TEST_LOGIN_FILE": folder.appendingPathComponent("mylogin.cnf").path]) { $1 }
         let toTool = Pipe()
         process.standardInput = FileHandle.nullDevice
         if input != nil { process.standardInput = toTool }
