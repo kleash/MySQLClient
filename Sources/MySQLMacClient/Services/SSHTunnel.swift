@@ -172,17 +172,20 @@ final class SSHTunnel: @unchecked Sendable {
     private func start() async throws {
         let errors = Pipe()
         let log = Log()
-        errors.fileHandleForReading.readabilityHandler = { handle in log.append(handle.availableData) }
+        // To the end of what ssh wrote, which can come after it has ended:
+        // its last words say why.
+        errors.fileHandleForReading.readabilityHandler = { handle in
+            let data = handle.availableData
+            if data.isEmpty { handle.readabilityHandler = nil }
+            log.append(data)
+        }
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/ssh")
         process.arguments = arguments
         process.standardInput = FileHandle.nullDevice
         process.standardOutput = FileHandle.nullDevice
         process.standardError = errors
-        process.terminationHandler = { [weak self] _ in
-            errors.fileHandleForReading.readabilityHandler = nil
-            self?.ended()
-        }
+        process.terminationHandler = { [weak self] _ in self?.ended() }
         // Under the lock, so a close() can't come between the check and
         // the start and leave this ssh running.
         try lock.withLock {
