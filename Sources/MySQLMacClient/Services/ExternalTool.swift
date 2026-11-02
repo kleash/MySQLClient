@@ -250,6 +250,8 @@ struct ExternalTool: Sendable {
         } catch {
             throw Failure(message: String(localized: "Couldn't run \(url.path): \(error.localizedDescription)"))
         }
+        Self.running.mutate { $0[folder] = process }
+        defer { Self.running.mutate { $0[folder] = nil } }
 
         let fed = DispatchSemaphore(value: 0)
         let inputError = Locked<Error?>(nil)
@@ -304,6 +306,19 @@ struct ExternalTool: Sendable {
         return messages
     }
 
+    /// The tools running now, by their folders: quitting skips `run`'s own
+    /// cleanup.
+    private static let running = Locked<[URL: Process]>([:])
+
+    /// Called when the app quits: ends each tool still running and deletes
+    /// its folder, with the option file.
+    static func endAll() {
+        for (folder, process) in running.value {
+            process.terminate()
+            try? FileManager.default.removeItem(at: folder)
+        }
+    }
+
     /// A value two threads share.
     final class Locked<Value>: @unchecked Sendable {
         private let lock = NSLock()
@@ -313,6 +328,7 @@ struct ExternalTool: Sendable {
             get { lock.withLock { stored } }
             set { lock.withLock { stored = newValue } }
         }
+        func mutate(_ body: (inout Value) -> Void) { lock.withLock { body(&stored) } }
     }
 
     /// A new folder in the temporary folder only this user can open

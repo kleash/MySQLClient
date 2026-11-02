@@ -178,6 +178,39 @@ final class ExternalToolTests: XCTestCase {
         XCTAssertEqual(said, "ok")
     }
 
+    /// Quitting ends the app with exit(), which skips `run`'s own cleanup: a
+    /// mysqldump still running carried on without the app, holding its
+    /// snapshot, and its option file stayed behind with the password.
+    func testEndingEveryToolStopsItAndDeletesItsOptionFile() async throws {
+        let tool = try fakeTool("""
+            touch "$(dirname "${1#--defaults-file=}")/started"
+            exec sleep 10
+            """)
+        let folders = {
+            Set(((try? FileManager.default.contentsOfDirectory(atPath: FileManager.default.temporaryDirectory.path)) ?? [])
+                .filter { $0.hasPrefix("mysqlclient-tool-") })
+        }
+        let before = folders()
+        let running = Task { try await tool.run([], optionFile: ExternalTool.optionFile(password: "s3cret")) }
+        var started = false
+        for _ in 0..<250 where !started {
+            try await Task.sleep(for: .milliseconds(20))
+            started = folders().subtracting(before).contains { folder in
+                FileManager.default.fileExists(atPath: FileManager.default.temporaryDirectory.appendingPathComponent("\(folder)/started").path)
+            }
+        }
+        XCTAssertTrue(started)
+
+        ExternalTool.endAll()
+        XCTAssertEqual(folders(), before, "the option file must be gone before the app exits")
+        do {
+            _ = try await running.value
+            XCTFail("the tool must have been ended")
+        } catch let failure as ExternalTool.Failure {
+            XCTAssertTrue(failure.message.contains("signal"), failure.message)
+        }
+    }
+
     // MARK: - Installed tools
 
     private func installedTool(_ kind: ExternalTool.Kind) async throws -> ExternalTool {
