@@ -13,33 +13,53 @@ import Foundation
 ///
 /// If ssh exits while the tunnel is open (the network dropped, the server
 /// restarted), it's started again on the same port, so `MySQLService`'s
-/// reconnect finds the database where it was.
+/// reconnect finds the database where it was. Until it listens again
+/// `isForwarding` is false: another program could have the port meanwhile.
+/// After about two minutes of failed restarts it stops, and keeps ssh's
+/// reason.
 final class SSHTunnel: @unchecked Sendable {
     struct Failure: Error, LocalizedError, Equatable {
         let message: String
         var errorDescription: String? { message }
     }
 
+    /// The pauses before each restart of an ssh that dropped, while the
+    /// restarts keep failing: about two minutes in all, time for a laptop to
+    /// wake up or its Wi-Fi to come back.
+    static let defaultRestartDelays: [TimeInterval] = [1, 2, 4, 8, 16, 30, 30, 30]
+
     private let settings: SSHSettings
     private let proxy: HTTPProxyConnector.Proxy?
     private let sshFolder: URL?
+    private let restartDelays: [TimeInterval]
     private let lock = NSLock()
     private var process: Process?
     private var relay: ProxyRelay?
     private var arguments: [String] = []
     private var isClosed = false
     private var isAccessingFolder = false
-    private var restartDelay: TimeInterval = 1
+    private var forwardIsUp = false
+    private var failure: Failure?
 
-    init(settings: SSHSettings, proxy: HTTPProxyConnector.Proxy?, sshFolder: URL?) {
+    init(settings: SSHSettings, proxy: HTTPProxyConnector.Proxy?, sshFolder: URL?,
+         restartDelays: [TimeInterval] = defaultRestartDelays) {
         self.settings = settings
         self.proxy = proxy
         self.sshFolder = sshFolder
+        self.restartDelays = restartDelays
     }
 
     deinit {
         close()
     }
+
+    /// Whether ssh's forward is listening: not from when ssh ends until a
+    /// restart has it listening again, nor once the tunnel has given up.
+    var isForwarding: Bool { lock.withLock { forwardIsUp } }
+
+    /// ssh's reason, once every restart in a row has failed and the tunnel
+    /// has stopped starting it.
+    var lastFailure: Failure? { lock.withLock { failure } }
 
     /// Starts ssh and waits until the forward is listening; the local port
     /// that leads to `databaseHost:databasePort` as the SSH server sees it.
@@ -75,6 +95,7 @@ final class SSHTunnel: @unchecked Sendable {
         // access has to be given back exactly once.
         let closing = lock.withLock {
             defer { isClosed = true }
+            forwardIsUp = false
             if process?.isRunning == true { process?.terminate() }
             return !isClosed
         }
@@ -163,7 +184,15 @@ final class SSHTunnel: @unchecked Sendable {
         // address blocked (max_connect_errors) for everyone using it.
         let deadline = Date().addingTimeInterval(45)
         while Date() < deadline {
-            if log.text.contains("Local forwarding listening on") { return }
+            if log.text.contains("Local forwarding listening on") {
+                // Under the lock with ended(), so an ssh that has ended
+                // meanwhile isn't taken for one that's up.
+                let isUp = lock.withLock {
+                    forwardIsUp = process.isRunning && !isClosed
+                    return forwardIsUp
+                }
+                if isUp { return }
+            }
             if !process.isRunning {
                 try? await Task.sleep(for: .milliseconds(50))  // the last of its output
                 throw Failure(message: failureMessage(log.text))
@@ -185,21 +214,31 @@ final class SSHTunnel: @unchecked Sendable {
         return String(localized: "The SSH connection to \(settings.host) failed: \(detail.isEmpty ? String(localized: "ssh ended without saying why.") : detail)")
     }
 
-    /// ssh ended. Unless the tunnel was closed, start it again after a
-    /// pause that grows while it keeps failing (up to 30 s).
+    /// ssh ended. If it was forwarding and the tunnel is open, it's started
+    /// again after each of `restartDelays` while it keeps failing; then the
+    /// tunnel stays down and keeps ssh's reason.
     private func ended() {
-        lock.lock()
-        let closed = isClosed
-        let delay = restartDelay
-        restartDelay = min(restartDelay * 2, 30)
-        lock.unlock()
-        guard !closed else { return }
-        Task.detached { [weak self] in
-            try? await Task.sleep(for: .seconds(delay))
-            guard let self else { return }
-            if (try? await self.start()) != nil {
-                self.lock.withLock { self.restartDelay = 1 }
+        let wasForwarding = lock.withLock {
+            defer { forwardIsUp = false }
+            return forwardIsUp  // never once closed
+        }
+        // One that never got that far failed to start: its start() says why.
+        guard wasForwarding else { return }
+        Task.detached { [weak self, restartDelays] in
+            var last: Failure?
+            for pause in restartDelays {
+                try? await Task.sleep(for: .seconds(pause))
+                do {
+                    guard let self else { return }
+                    return try await self.start()
+                } catch is CancellationError {
+                    return  // closed meanwhile
+                } catch {
+                    last = error as? Failure ?? Failure(message: error.localizedDescription)
+                }
             }
+            guard let self else { return }
+            self.lock.withLock { self.failure = last }
         }
     }
 
@@ -254,6 +293,7 @@ final class ProxyRelay: @unchecked Sendable {
     private let targetPort: Int
     private let lock = NSLock()
     private var failure: String?
+    private var loginRefused = false
 
     /// Why the proxy last refused a connection, if it did.
     var lastFailure: String? {
@@ -305,12 +345,19 @@ final class ProxyRelay: @unchecked Sendable {
     private func relay(_ client: Int32) {
         var on: Int32 = 1
         setsockopt(client, SOL_SOCKET, SO_NOSIGPIPE, &on, socklen_t(MemoryLayout<Int32>.size))
+        // Once the proxy has turned the login down, asking again would only
+        // send it again, at every restart of ssh: an account lockout.
+        guard !lock.withLock({ loginRefused }) else {
+            Darwin.close(client)
+            return
+        }
         let server: Int32
         do {
             server = try HTTPProxyConnector.connect(through: proxy, to: targetHost, port: targetPort)
         } catch {
             lock.lock()
             failure = error.localizedDescription
+            loginRefused = (error as? HTTPProxyConnector.Failure)?.loginRefused == true
             lock.unlock()
             Darwin.close(client)
             return

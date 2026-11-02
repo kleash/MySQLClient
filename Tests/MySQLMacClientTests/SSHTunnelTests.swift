@@ -38,11 +38,12 @@ final class SSHTunnelTests: XCTestCase {
     }
 
     /// Opens a tunnel to the private database and connects through it.
-    private func connect(_ settings: SSHSettings, proxyPassword: String = "proxy-test-password") async throws -> MySQLService {
+    private func connect(_ settings: SSHSettings, proxyPassword: String = "proxy-test-password",
+                         restartDelays: [TimeInterval] = SSHTunnel.defaultRestartDelays) async throws -> MySQLService {
         let proxy = settings.proxy.map {
             HTTPProxyConnector.Proxy(host: $0.host, port: $0.port, username: $0.username, password: proxyPassword)
         }
-        let tunnel = SSHTunnel(settings: settings, proxy: proxy, sshFolder: sshFolder)
+        let tunnel = SSHTunnel(settings: settings, proxy: proxy, sshFolder: sshFolder, restartDelays: restartDelays)
         self.tunnel = tunnel
         let localPort = try await tunnel.open(to: "private-mariadb", port: 3306)
         let service = MySQLService()
@@ -54,6 +55,20 @@ final class SSHTunnelTests: XCTestCase {
     private func assertReachesThePrivateDatabase(_ service: MySQLService) async throws {
         let rows = try await service.textQuery("SELECT @@hostname AS host, 1 + 1 AS two")
         XCTAssertEqual(rows.first?.column("two")?.string, "2")
+    }
+
+    /// Ends this test's ssh, as a dropped network would.
+    private func killSSH() throws {
+        let killed = try Process.run(URL(fileURLWithPath: "/usr/bin/pkill"), arguments: ["-f", "--", sshFolder.path])
+        killed.waitUntilExit()
+        XCTAssertEqual(killed.terminationStatus, 0, "no ssh of this test's was running")
+    }
+
+    /// Someone else's key, remembered for the SSH server: its own then looks
+    /// changed to ssh.
+    private func rememberAnotherHostKey() throws {
+        try "[127.0.0.1]:\(direct.port) ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl\n"
+            .write(to: sshFolder.appendingPathComponent("known_hosts"), atomically: true, encoding: .utf8)
     }
 
     func testReachesADatabaseOnlyTheSSHServerCanReach() async throws {
@@ -78,6 +93,15 @@ final class SSHTunnelTests: XCTestCase {
         }
     }
 
+    /// A login the proxy turned down is told from its other refusals: the
+    /// relay stops asking then, since each restart of ssh would send it again.
+    func testTellsALoginTheProxyTurnedDown() throws {
+        let proxy = HTTPProxyConnector.Proxy(host: "127.0.0.1", port: behindProxy.proxy!.port, username: "proxyuser", password: "wrong")
+        XCTAssertThrowsError(try HTTPProxyConnector.connect(through: proxy, to: "ssh", port: 22)) { error in
+            XCTAssertEqual((error as? HTTPProxyConnector.Failure)?.loginRefused, true, "\(error)")
+        }
+    }
+
     func testSaysWhenTheServerRefusesTheKey() async throws {
         let otherKey = sshFolder.appendingPathComponent("other_key")
         let keygen = try Process.run(URL(fileURLWithPath: "/usr/bin/ssh-keygen"), arguments: ["-q", "-t", "ed25519", "-N", "", "-f", otherKey.path])
@@ -95,8 +119,7 @@ final class SSHTunnelTests: XCTestCase {
     /// A host key that differs from the one remembered is someone else
     /// answering: ssh must refuse, not replace it.
     func testRefusesAServerWhoseHostKeyHasChanged() async throws {
-        try "[127.0.0.1]:\(direct.port) ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl\n"
-            .write(to: sshFolder.appendingPathComponent("known_hosts"), atomically: true, encoding: .utf8)
+        try rememberAnotherHostKey()
         do {
             _ = try await connect(direct)
             XCTFail("connected to a server whose host key changed")
@@ -109,10 +132,23 @@ final class SSHTunnelTests: XCTestCase {
     /// same port, and the next query reconnects through it.
     func testComesBackAfterSSHEnds() async throws {
         let service = try await connect(direct)
-        let killed = try Process.run(URL(fileURLWithPath: "/usr/bin/pkill"), arguments: ["-f", "--", "-p \(direct.port) .*-- 127.0.0.1"])
-        killed.waitUntilExit()
+        try killSSH()
         try await Task.sleep(for: .seconds(3))
         try await assertReachesThePrivateDatabase(service)
+    }
+
+    /// ssh can't come back (here the server's host key no longer matches):
+    /// the tunnel stops starting it once its restarts have all failed (three
+    /// short ones here), and keeps ssh's reason.
+    func testStopsStartingSSHAgainWhenItKeepsFailing() async throws {
+        _ = try await connect(direct, restartDelays: [0.5, 0.5, 0.5])
+        let tunnel = try XCTUnwrap(tunnel)
+        try rememberAnotherHostKey()
+        try killSSH()
+        let givenUp = Date().addingTimeInterval(30)
+        while tunnel.lastFailure == nil, Date() < givenUp { try await Task.sleep(for: .milliseconds(100)) }
+        let reason = try XCTUnwrap(tunnel.lastFailure, "still starting ssh again").message
+        XCTAssertTrue(reason.contains("Host key verification failed"), reason)
     }
 
     /// The connection form opens the tunnel, logs in through it, and saves

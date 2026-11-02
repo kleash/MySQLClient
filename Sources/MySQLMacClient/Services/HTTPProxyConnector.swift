@@ -16,6 +16,9 @@ enum HTTPProxyConnector {
 
     struct Failure: Error, LocalizedError, Equatable {
         let message: String
+        /// The proxy turned down the login it was sent: asking again would
+        /// only send it again.
+        var loginRefused = false
         var errorDescription: String? { message }
     }
 
@@ -55,8 +58,11 @@ enum HTTPProxyConnector {
             }
             close(fd)
             let offered = challenges(in: headText)
+            // tinyproxy turns a login down with 401, others with 407 again.
+            let loginRefused = authorization != nil && (code == 401 || code == 407)
             guard code == 407, !proxy.username.isEmpty, attempt < 2 else {
-                throw Failure(message: String(localized: "The proxy refused the connection to \(target): \(statusLine)"))
+                throw Failure(message: String(localized: "The proxy refused the connection to \(target): \(statusLine)"),
+                              loginRefused: loginRefused)
             }
             let sentDigest = authorization?.hasPrefix("Digest ") == true
             if let digest = offered.first(where: { $0.scheme == "digest" })?.parameters,
@@ -66,7 +72,8 @@ enum HTTPProxyConnector {
             } else if authorization == nil, offered.isEmpty || offered.contains(where: { $0.scheme == "basic" }) {
                 authorization = "Basic " + Data("\(proxy.username):\(proxy.password)".utf8).base64EncodedString()
             } else {
-                throw Failure(message: String(localized: "The proxy refused the connection to \(target): \(statusLine)"))
+                throw Failure(message: String(localized: "The proxy refused the connection to \(target): \(statusLine)"),
+                              loginRefused: loginRefused)
             }
         }
         throw Failure(message: String(localized: "The proxy refused the connection to \(target)."))
