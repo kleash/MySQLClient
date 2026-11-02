@@ -16,6 +16,13 @@ struct StatusBarView: View {
             Text("\(profile.username)@\(profile.host):\(profile.port)\(profile.database.map { "/\($0)" } ?? "")")
                 .font(.system(size: 14))
                 .foregroundStyle(.secondary)
+            // Through SSH, Host is the database as the SSH server sees it,
+            // often 127.0.0.1: alone it would read like a local one.
+            if let ssh = profile.ssh {
+                Text("via \(ssh.host)")
+                    .font(.system(size: 14))
+                    .foregroundStyle(.secondary)
+            }
 
             if let rowCount {
                 Text("•")

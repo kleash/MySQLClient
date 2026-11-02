@@ -301,7 +301,8 @@ private struct ConnectionRow: View {
 
     var body: some View {
         RowHeader(
-            title: "\(profile.username)@\(profile.host)",
+            // Through SSH, Host alone would read like a local database.
+            title: "\(profile.username)@\(profile.host)" + (profile.ssh.map { " " + String(localized: "via \($0.host)") } ?? ""),
             systemImage: "server.rack",
             // Reuses the database row's color rather than adding a
             // dedicated setting for a single row — see the create-database
