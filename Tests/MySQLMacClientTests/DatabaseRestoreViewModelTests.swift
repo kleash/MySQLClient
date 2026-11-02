@@ -531,6 +531,46 @@ final class DatabaseRestoreViewModelTests: XCTestCase {
         XCTAssertEqual(restored, [1, 2])
     }
 
+    /// Carrying on, the client doesn't reconnect once its connection drops:
+    /// every statement after fails, it still ends with exit status 0, and
+    /// the sheet said it had restored every other statement.
+    func testMysqlClientReportsADroppedConnectionWhenCarryingOn() async throws {
+        let viewModel = try await restoreWithTheMysqlClient(Data("""
+            CREATE TABLE t (id INT PRIMARY KEY);
+            INSERT INTO t VALUES (1);
+            SET @kill = CONCAT('KILL ', CONNECTION_ID());
+            PREPARE kill_itself FROM @kill;
+            EXECUTE kill_itself;
+            INSERT INTO t VALUES (2);
+            INSERT INTO t VALUES (3);
+            """.utf8)) { $0.stopOnFirstError = false }
+
+        XCTAssertEqual(viewModel.failure, .connectionLost(line: 6), viewModel.errorMessage ?? "nil")
+        XCTAssertFalse(viewModel.didFinishSuccessfully)
+        let restored = try await ids(in: "t")
+        XCTAssertEqual(restored, [1])
+    }
+
+    /// Only the first 100 lines the client writes are kept: past that, the
+    /// sheet says how many statements failed.
+    func testMysqlClientCountsEveryFailedStatement() async throws {
+        let lines = ["CREATE TABLE t (id INT PRIMARY KEY);", "INSERT INTO t VALUES (1);"]
+            + Array(repeating: "INSERT INTO t VALUES (1);", count: 150) + ["INSERT INTO t VALUES (2);"]
+        let viewModel = try await restoreWithTheMysqlClient(Data(lines.joined(separator: "\n").utf8)) { $0.stopOnFirstError = false }
+
+        XCTAssertTrue(viewModel.errorMessage?.contains("150 failed statements") ?? false, viewModel.errorMessage ?? "nil")
+        let restored = try await ids(in: "t")
+        XCTAssertEqual(restored, [1, 2])
+    }
+
+    /// The client's own errors (a DELIMITER without a delimiter) have no
+    /// code; their line is the file's too.
+    func testTheClientsErrorsNameTheFilesLine() {
+        let messages = "ERROR 1062 (23000) at line 5: Duplicate entry\nERROR at line 9: DELIMITER must be followed by a 'delimiter' character or string"
+        XCTAssertEqual(DatabaseRestoreViewModel.fileLines(in: messages, questionLines: [1, 4]),
+                       "ERROR 1062 (23000) at line 1: Duplicate entry\nERROR at line 5: DELIMITER must be followed by a 'delimiter' character or string")
+    }
+
     /// What the built-in restore refuses as not UTF-8 (a mysqldump file made
     /// without --hex-blob), and a line break written raw inside a string:
     /// the client must store exactly these bytes.

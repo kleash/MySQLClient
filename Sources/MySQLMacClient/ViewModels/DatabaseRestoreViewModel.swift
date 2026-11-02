@@ -296,6 +296,11 @@ final class DatabaseRestoreViewModel: ObservableObject {
             return
         }
         let questionLines = ExternalTool.Locked<[Int]>([])
+        // Every ERROR line, also past the 100 lines `run` keeps, and the line
+        // of the first that says the connection dropped: carrying on, the
+        // client doesn't reconnect, so every statement after it failed.
+        let failures = ExternalTool.Locked(0)
+        let lostAt = ExternalTool.Locked<Int?>(nil)
         do {
             let isMariaDB = await service.serverVersion?.contains("MariaDB") ?? false
             let tool = try await ExternalTool.find(.client, configuredPath: SettingsStore.shared.settings.general.clientToolPath,
@@ -318,8 +323,20 @@ final class DatabaseRestoreViewModel: ObservableObject {
                         self.progress = Progress(bytesRead: sent.bytesRead, totalBytes: totalBytes, statementsRun: sent.statementsRun)
                     }
                 }
-            }, output: output.fileHandleForWriting), questionLines: questionLines.value)
-            if messages.split(separator: "\n").contains(where: { $0.hasPrefix("ERROR ") }) {
+            }, output: output.fileHandleForWriting, onErrorLine: { line in
+                guard line.hasPrefix("ERROR ") else { return }
+                failures.mutate { $0 += 1 }
+                if lostAt.value == nil, let lost = line.prefixMatch(of: /ERROR 20(?:06|13) \(\w+\) at line (\d+)/) {
+                    lostAt.value = Int(lost.1)
+                }
+            }), questionLines: questionLines.value)
+            if let line = lostAt.value {
+                let lost = RestoreError.connectionLost(line: Self.fileLine(line, questionLines: questionLines.value))
+                failure = lost
+                errorMessage = (lost.errorDescription ?? "") + "\n" + messages
+            } else if failures.value > 100 {
+                errorMessage = String(localized: "\(tool.name) reported \(failures.value) failed statements; it restored every other statement. Its first 100 messages:\n\(messages)")
+            } else if failures.value > 0 {
                 errorMessage = String(localized: "\(tool.name) reported errors; it restored every other statement:\n\(messages)")
             } else {
                 didFinishSuccessfully = true
@@ -334,13 +351,17 @@ final class DatabaseRestoreViewModel: ObservableObject {
     }
 
     /// The client's messages with the line each error names given as the
-    /// file's: every question `pass` asked took two lines, after the line
-    /// `questionLines` holds.
+    /// file's, its own errors (without a code) too.
     nonisolated static func fileLines(in messages: String, questionLines: [Int]) -> String {
-        messages.replacing(/(?m)^(ERROR \d+ \(\w+\) at line )(\d+)/) { match in
-            let line = Int(match.output.2) ?? 0
-            return "\(match.output.1)\(line - 2 * questionLines.count { $0 < line })"
+        messages.replacing(/(?m)^(ERROR (?:\d+ \(\w+\) )?at line )(\d+)/) { match in
+            "\(match.output.1)\(fileLine(Int(match.output.2) ?? 0, questionLines: questionLines))"
         }
+    }
+
+    /// The file's line for one the client names: every question `pass`
+    /// asked took two lines, after the line `questionLines` holds.
+    private nonisolated static func fileLine(_ line: Int, questionLines: [Int]) -> Int {
+        line - 2 * questionLines.count { $0 < line }
     }
 
     /// Writes the file to `input` up to the end of its last whole statement
