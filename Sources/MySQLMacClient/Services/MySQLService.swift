@@ -204,6 +204,8 @@ actor MySQLService {
     /// user and encryption, with the password only in their option file.
     func externalToolConnection() throws -> ExternalTool.Connection {
         guard let credentials = lastCredentials else { throw MySQLServiceError.notConnected }
+        // The tool logs in at once, so it gets the same rule as a reconnect.
+        if let tunnel, !tunnel.isForwarding { throw tunnel.lastFailure ?? MySQLError.closed }
         return ExternalTool.Connection(
             host: credentials.host,
             port: credentials.port,

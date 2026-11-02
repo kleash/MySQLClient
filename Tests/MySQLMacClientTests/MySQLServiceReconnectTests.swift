@@ -84,6 +84,11 @@ final class MySQLServiceReconnectTests: XCTestCase {
             try? await separate.disconnect()
             XCTFail("opened a separate connection through a tunnel that is down")
         } catch MySQLError.closed {}
+        // Nor mysqldump or the mysql client, which would log in at once.
+        do {
+            _ = try await service.externalToolConnection()
+            XCTFail("gave mysqldump the login for a tunnel that is down")
+        } catch MySQLError.closed {}
     }
 
     /// A connection closed before the server's greeting (as an SSH server
