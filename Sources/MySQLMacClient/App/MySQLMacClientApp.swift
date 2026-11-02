@@ -7,12 +7,10 @@ import AppKit
 /// draws and takes clicks, but keyboard focus stays with whatever app was
 /// frontmost before launch (e.g. the IDE) and every keystroke leaks there.
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    /// Set by the app, so quitting can end an SSH tunnel's ssh, which
-    /// would otherwise outlive the app.
-    weak var appState: AppState?
-
+    /// Ends the ssh of every SSH tunnel, which would outlive the app: the
+    /// session's, and any still opening or closing.
     func applicationWillTerminate(_ notification: Notification) {
-        appState?.activeSession?.tunnel?.close()
+        SSHTunnel.closeAll()
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -74,7 +72,6 @@ struct MySQLMacClientApp: App {
                 }
             }
             .frame(minWidth: 800, minHeight: 560)
-            .onAppear { appDelegate.appState = appState }
             .environmentObject(appearanceStore)
             .environmentObject(settingsStore)
             .preferredColorScheme(appearanceStore.mode.colorScheme)

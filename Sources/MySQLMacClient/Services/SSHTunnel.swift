@@ -28,6 +28,11 @@ final class SSHTunnel: @unchecked Sendable {
     /// wake up or its Wi-Fi to come back.
     static let defaultRestartDelays: [TimeInterval] = [1, 2, 4, 8, 16, 30, 30, 30]
 
+    /// Every tunnel not yet freed, so quitting can end their ssh, which
+    /// would otherwise outlive the app.
+    nonisolated(unsafe) private static let all = NSHashTable<SSHTunnel>.weakObjects()
+    private static let allLock = NSLock()
+
     private let settings: SSHSettings
     private let proxy: HTTPProxyConnector.Proxy?
     private let sshFolder: URL?
@@ -47,6 +52,7 @@ final class SSHTunnel: @unchecked Sendable {
         self.proxy = proxy
         self.sshFolder = sshFolder
         self.restartDelays = restartDelays
+        Self.allLock.withLock { Self.all.add(self) }
     }
 
     deinit {
@@ -60,6 +66,11 @@ final class SSHTunnel: @unchecked Sendable {
     /// ssh's reason, once every restart in a row has failed and the tunnel
     /// has stopped starting it.
     var lastFailure: Failure? { lock.withLock { failure } }
+
+    /// Ends every tunnel's ssh, for quitting.
+    static func closeAll() {
+        allLock.withLock { all.allObjects }.forEach { $0.close() }
+    }
 
     /// Starts ssh and waits until the forward is listening; the local port
     /// that leads to `databaseHost:databasePort` as the SSH server sees it.
@@ -104,9 +115,10 @@ final class SSHTunnel: @unchecked Sendable {
         if isAccessingFolder { sshFolder?.stopAccessingSecurityScopedResource() }
     }
 
-    /// ssh's arguments: no shell, no stdin, the forward, keepalives that
-    /// notice a dead connection within 45 s, and the host after `--` so a
-    /// host name can never be read as an option.
+    /// ssh's arguments: no shell, no stdin, the forward, a connection of its
+    /// own (one shared through a ControlMaster would outlive close()),
+    /// keepalives that notice a dead connection within 45 s, and the host
+    /// after `--` so a host name can never be read as an option.
     static func arguments(
         settings: SSHSettings,
         localPort: Int,
@@ -121,6 +133,7 @@ final class SSHTunnel: @unchecked Sendable {
             "-L", "127.0.0.1:\(localPort):\(target):\(databasePort)",
             "-p", String(settings.port),
             "-o", "ExitOnForwardFailure=yes",
+            "-o", "ControlPath=none",
             "-o", "BatchMode=yes",
             "-o", "StrictHostKeyChecking=accept-new",
             "-o", "ConnectTimeout=15",

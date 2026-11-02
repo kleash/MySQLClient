@@ -248,6 +248,8 @@ final class SSHTunnelArgumentTests: XCTestCase {
         XCTAssertEqual(arguments.suffix(2), ["--", "-oProxyCommand=touch /tmp/pwned"])
         XCTAssertTrue(arguments.contains("127.0.0.1:40000:[::1]:3306"))
         XCTAssertTrue(arguments.contains("/keys/100%%.pem"))
+        // A connection of its own, never a ControlMaster's that close() can't end.
+        XCTAssertTrue(arguments.contains("ControlPath=none"))
     }
 
     /// RFC 2617's own example: user Mufasa, GET /dir/index.html.
