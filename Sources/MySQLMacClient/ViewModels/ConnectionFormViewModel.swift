@@ -59,6 +59,12 @@ final class ConnectionFormViewModel: ObservableObject {
     /// The SSH folder the user chose in the open panel, for ssh now and
     /// after the next launch.
     func useSSHFolder(_ folder: URL) {
+        // ssh is given its known_hosts there in quotes, in an option that a
+        // double quote or a control character (a line break) would cut short.
+        guard !folder.path.unicodeScalars.contains(where: { $0 == "\"" || $0.properties.generalCategory == .control }) else {
+            errorMessage = String(localized: "ssh can't use a folder whose path has a double quote or a control character in it.")
+            return
+        }
         UserDefaults.standard.set(try? folder.bookmarkData(options: .withSecurityScope), forKey: Self.sshFolderDefaultsKey)
         sshFolder = folder
     }
@@ -209,5 +215,8 @@ final class ConnectionFormViewModel: ObservableObject {
         connectionStore.remove(profile)
         try? keychainService.deletePassword(forConnectionId: profile.id)
         try? keychainService.deletePassword(forConnectionId: profile.id, item: KeychainService.proxyPasswordItem)
+        // The form keeps its fields, as a new connection: Connect mustn't
+        // save them under the deleted one's id.
+        if editingProfileId == profile.id { editingProfileId = nil }
     }
 }

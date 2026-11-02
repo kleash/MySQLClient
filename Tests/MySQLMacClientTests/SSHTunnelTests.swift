@@ -268,4 +268,17 @@ final class SSHTunnelArgumentTests: XCTestCase {
         XCTAssertTrue(header?.contains(#"response="753927fa0e85d155564e2e272a28d1802ca10daf4496794697cf8db5856cb6c1""#) ?? false,
                       header ?? "nil")
     }
+
+    /// ssh is given the SSH folder's known_hosts in quotes, in an option
+    /// that a double quote or a control character in the path would break.
+    @MainActor
+    func testRefusesAnSSHFolderWhosePathSSHWouldMisread() {
+        let form = ConnectionFormViewModel(connectionStore: ConnectionStore(fileURL: URL(fileURLWithPath: "/dev/null")))
+        for path in ["/Users/a\"b/.ssh", "/Users/a\nb/.ssh"] {
+            form.errorMessage = nil
+            form.useSSHFolder(URL(fileURLWithPath: path))
+            XCTAssertNil(form.sshFolder, path)
+            XCTAssertNotNil(form.errorMessage, path)
+        }
+    }
 }
