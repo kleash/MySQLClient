@@ -42357,6 +42357,113 @@
         }
       }
     },
+    "ssh can't use a folder whose path has a double quote or a control character in it.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "لا يمكن لـ ssh أن يستخدم مجلدًا يحتوي مساره على علامة اقتباس مزدوجة أو حرف تحكم."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ssh kann keinen Ordner verwenden, dessen Pfad ein doppeltes Anführungszeichen oder ein Steuerzeichen enthält."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ssh no puede usar una carpeta cuya ruta contenga una comilla doble o un carácter de control."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ssh ne peut pas utiliser un dossier dont le chemin contient un guillemet double ou un caractère de contrôle."
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ssh ऐसे फ़ोल्डर का उपयोग नहीं कर सकता जिसके पाथ में डबल कोट या कंट्रोल कैरेक्टर हो।"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ssh tidak dapat menggunakan folder yang jalurnya berisi tanda kutip ganda atau karakter kontrol."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ssh non può usare una cartella il cui percorso contenga una virgoletta doppia o un carattere di controllo."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ssh は、パスに二重引用符または制御文字を含むフォルダを使用できません。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ssh는 경로에 큰따옴표나 제어 문자가 들어 있는 폴더를 사용할 수 없습니다."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ssh nie może używać folderu, którego ścieżka zawiera podwójny cudzysłów lub znak sterujący."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O ssh não pode usar uma pasta cujo caminho contenha aspas duplas ou um caractere de controle."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ssh не может использовать папку, путь к которой содержит двойную кавычку или управляющий символ."
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ssh ใช้โฟลเดอร์ที่มีเครื่องหมายอัญประกาศคู่หรืออักขระควบคุมอยู่ในพาธไม่ได้"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ssh, yolunda çift tırnak veya kontrol karakteri bulunan bir klasörü kullanamaz."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ssh không thể dùng thư mục có đường dẫn chứa dấu ngoặc kép hoặc ký tự điều khiển."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ssh 无法使用路径中含有双引号或控制字符的文件夹。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ssh 無法使用路徑中含有雙引號或控制字元的檔案夾。"
+          }
+        }
+      }
+    },
     "ssh ended without saying why.": {
       "extractionState": "manual",
       "localizations": {
@@ -42567,6 +42674,113 @@
           "stringUnit": {
             "state": "translated",
             "value": "未知"
+          }
+        }
+      }
+    },
+    "via %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "عبر %@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "über %@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "vía %@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "via %@"
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ के ज़रिए"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "melalui %@"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "tramite %@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 経由"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 경유"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "przez %@"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "via %@"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "через %@"
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ผ่าน %@"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ üzerinden"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "qua %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "通过 %@"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "透過 %@"
           }
         }
       }
