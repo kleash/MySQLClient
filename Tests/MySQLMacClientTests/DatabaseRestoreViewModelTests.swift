@@ -563,6 +563,19 @@ final class DatabaseRestoreViewModelTests: XCTestCase {
         XCTAssertEqual(restored, [1, 2])
     }
 
+    /// The client drops a byte order mark only from the first line it reads,
+    /// which is the first question's: the file's own reached the server in
+    /// front of its first statement.
+    func testMysqlClientRestoresAFileThatStartsWithAByteOrderMark() async throws {
+        let viewModel = try await restoreWithTheMysqlClient(
+            Data([0xEF, 0xBB, 0xBF]) + Data("CREATE TABLE t (id INT PRIMARY KEY);\nINSERT INTO t VALUES (1);\n".utf8))
+
+        XCTAssertNil(viewModel.errorMessage)
+        XCTAssertTrue(viewModel.didFinishSuccessfully)
+        let restored = try await ids(in: "t")
+        XCTAssertEqual(restored, [1])
+    }
+
     /// The client's own errors (a DELIMITER without a delimiter) have no
     /// code; their line is the file's too.
     func testTheClientsErrorsNameTheFilesLine() {

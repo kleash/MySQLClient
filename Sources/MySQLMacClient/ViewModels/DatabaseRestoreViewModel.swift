@@ -447,7 +447,9 @@ final class DatabaseRestoreViewModel: ObservableObject {
             if !asked {
                 let chunk = try file.read(upToCount: readSize) ?? Data()
                 reachedEnd = chunk.isEmpty
-                pending.append(contentsOf: chunk)
+                // The client drops a byte order mark only from the first line
+                // it reads, which is the first question's.
+                pending.append(contentsOf: sent.bytesRead == 0 && chunk.starts(with: [0xEF, 0xBB, 0xBF]) ? chunk.dropFirst(3) : chunk)
                 sent.bytesRead += Int64(chunk.count)
             }
             let scanned = DelimiterScript.scan(pending, from: state, isFinal: reachedEnd, stopsAfterSQLMode: true)
