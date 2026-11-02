@@ -39,8 +39,6 @@ struct ExternalTool: Sendable {
     }
 
     let url: URL
-    /// What `--version` prints, e.g. `mysqldump  Ver 9.6.0 for macos26.2 on arm64 (Homebrew)`.
-    let version: String
     /// What `--help` prints.
     let help: String
 
@@ -91,7 +89,7 @@ struct ExternalTool: Sendable {
                 ? String(localized: "No mysqldump or mariadb-dump was found. Choose one in Settings ▸ General.")
                 : String(localized: "No mysql or mariadb client was found. Choose one in Settings ▸ General."))
         }
-        return ExternalTool(url: url, version: try await output(of: url, "--version"), help: try await output(of: url, "--help"))
+        return ExternalTool(url: url, help: try await output(of: url, "--help"))
     }
 
     /// What the tool prints for `option`, without reading any option file.

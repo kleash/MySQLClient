@@ -12,7 +12,6 @@ final class ExternalToolTests: XCTestCase {
     /// abridged): the options are taken from there, not from the version.
     private let mysqldump = ExternalTool(
         url: URL(fileURLWithPath: "/opt/homebrew/opt/mysql-client/bin/mysqldump"),
-        version: "mysqldump  Ver 9.6.0 for macos26.2 on arm64 (Homebrew)",
         help: """
             --no-login-paths        Don't read login paths from the login path file.
               -y, --no-tablespaces
@@ -32,7 +31,6 @@ final class ExternalToolTests: XCTestCase {
 
     private let mariadbDump = ExternalTool(
         url: URL(fileURLWithPath: "/opt/homebrew/bin/mariadb-dump"),
-        version: "mariadb-dump from 11.4.2-MariaDB, client 10.19 for osx10.19 (arm64)",
         help: """
               -y, --no-tablespaces
               -E, --events        Dump events.
@@ -48,7 +46,6 @@ final class ExternalToolTests: XCTestCase {
 
     private let mysql = ExternalTool(
         url: URL(fileURLWithPath: "/opt/homebrew/opt/mysql-client/bin/mysql"),
-        version: "mysql  Ver 9.6.0 for macos26.2 on arm64 (Homebrew)",
         help: """
               --binary-mode       By default, ASCII '\\0' is disallowed and '\\r\\n' is
               -c, --comments      Preserve comments. Send comments to the server. The
@@ -116,7 +113,7 @@ final class ExternalToolTests: XCTestCase {
 
         // Through a tunnel the tool would check the certificate against 127.0.0.1.
         XCTAssertThrowsError(try mysqldump.dumpArguments(database: "shop", connection: connection(tls: .verifyCertificate, serverName: "db.example.com")))
-        let noTLSOptions = ExternalTool(url: mysql.url, version: mysql.version, help: "  --force")
+        let noTLSOptions = ExternalTool(url: mysql.url, help: "  --force")
         XCTAssertThrowsError(try noTLSOptions.restoreArguments(database: nil, stopOnError: true, connection: connection(tls: .required)))
     }
 
