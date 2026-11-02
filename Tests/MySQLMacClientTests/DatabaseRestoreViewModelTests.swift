@@ -479,15 +479,20 @@ final class DatabaseRestoreViewModelTests: XCTestCase {
     }
 
     /// With --force the client carries on and still exits with 0, so its
-    /// errors have to be read from what it says.
+    /// errors have to be read from what it says. MariaDB's client also writes
+    /// out each failed statement unless told not to: one of over 100 lines
+    /// left no room for the errors.
     func testMysqlClientCarriesOnPastFailedStatementsAndReportsThem() async throws {
+        let wide = "CREATE TABLE t (\n" + (1...100).map { "  c\($0) INT,\n" }.joined() + "  id INT PRIMARY KEY\n);"
         let viewModel = try await restoreWithTheMysqlClient(Data("""
             CREATE TABLE t (id INT PRIMARY KEY);
+            \(wide)
             INSERT INTO t VALUES (1);
             INSERT INTO t VALUES (1);
             INSERT INTO t VALUES (2);
             """.utf8)) { $0.stopOnFirstError = false }
 
+        XCTAssertTrue(viewModel.errorMessage?.contains("already exists") ?? false, viewModel.errorMessage ?? "nil")
         XCTAssertTrue(viewModel.errorMessage?.contains("Duplicate entry") ?? false, viewModel.errorMessage ?? "nil")
         XCTAssertFalse(viewModel.didFinishSuccessfully)
         let restored = try await ids(in: "t")

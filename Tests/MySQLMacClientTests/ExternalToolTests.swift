@@ -55,6 +55,19 @@ final class ExternalToolTests: XCTestCase {
             """
     )
 
+    private let mariadb = ExternalTool(
+        url: URL(fileURLWithPath: "/opt/homebrew/bin/mariadb"),
+        help: """
+              --binary-mode       Binary mode allows certain character sequences to be
+              -c, --comments      Preserve comments. Send comments to the server. The
+              -f, --force         Continue even if we get an SQL error. Sets
+              --print-query-on-error
+                                  Print the query if there was an error. Is only enabled in
+              --ssl               Enable SSL for connection (automatically enabled with
+              --ssl-verify-server-cert
+            """
+    )
+
     private func connection(tls: TLSMode? = nil, serverName: String? = nil) -> ExternalTool.Connection {
         ExternalTool.Connection(host: "db.example.com", port: 3307, username: "backup", tls: tls, serverName: serverName,
                                 optionFile: ExternalTool.optionFile(password: "s3cret"))
@@ -95,6 +108,10 @@ final class ExternalToolTests: XCTestCase {
         let carryingOn = try mysql.restoreArguments(database: nil, stopOnError: false, connection: connection())
         XCTAssertTrue(carryingOn.contains("--force"))
         XCTAssertFalse(carryingOn.contains { $0.hasPrefix("--database") }, "the file's own USE decides")
+
+        // MariaDB's client writes out each failed statement before its error.
+        XCTAssertTrue(try mariadb.restoreArguments(database: "shop", stopOnError: false, connection: connection()).contains("--skip-print-query-on-error"))
+        XCTAssertFalse(carryingOn.contains("--skip-print-query-on-error"), "MySQL's client has no such option")
     }
 
     func testEncryptionCarriesOverOrIsRefused() throws {
@@ -109,7 +126,11 @@ final class ExternalToolTests: XCTestCase {
         for tls in [TLSMode.required, .verifyCertificate] {
             let arguments = try mariadbDump.dumpArguments(database: "shop", connection: connection(tls: tls))
             XCTAssertTrue(arguments.contains("--ssl") && arguments.contains("--ssl-verify-server-cert"), "\(tls)")
+            XCTAssertFalse(arguments.contains("--skip-ssl-verify-server-cert"), "\(tls)")
         }
+        // From 11.4 it checks a certificate unless told not to, and so refuses
+        // a server without TLS.
+        XCTAssertTrue(try mariadbDump.dumpArguments(database: "shop", connection: connection()).contains("--skip-ssl-verify-server-cert"))
 
         // Through a tunnel the tool would check the certificate against 127.0.0.1.
         XCTAssertThrowsError(try mysqldump.dumpArguments(database: "shop", connection: connection(tls: .verifyCertificate, serverName: "db.example.com")))
@@ -187,7 +208,8 @@ final class ExternalToolTests: XCTestCase {
             _ = try await tool.run(try tool.dumpArguments(database: database, connection: connection),
                                    optionFile: connection.optionFile, output: output)
             try output.close()
-            XCTAssertTrue(try String(contentsOf: dumpURL, encoding: .utf8).contains("INSERT INTO `t` VALUES (42)"))
+            // MariaDB's puts the rows on the line after VALUES.
+            XCTAssertNotNil(try String(contentsOf: dumpURL, encoding: .utf8).firstMatch(of: /INSERT INTO `t` VALUES\s*\(42\)/))
         } catch {
             XCTFail("\(error)")
         }

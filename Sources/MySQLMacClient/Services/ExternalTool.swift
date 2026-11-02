@@ -138,9 +138,10 @@ struct ExternalTool: Sendable {
 
     /// The connection's encryption in the tool's own options, or a refusal
     /// where the tool can't be made to insist on it. Without encryption the
-    /// tool does what it does by default.
+    /// tool doesn't check a certificate, which MariaDB's do by default from
+    /// 11.4, so they'd refuse a server without TLS.
     private func tlsArguments(_ connection: Connection) throws -> [String] {
-        guard let tls = connection.tls else { return [] }
+        guard let tls = connection.tls else { return supports("ssl-verify-server-cert") ? ["--skip-ssl-verify-server-cert"] : [] }
         if tls == .verifyCertificate, connection.serverName != nil {
             throw Failure(message: String(localized: "Through an SSH tunnel \(name) can only check the server's certificate against 127.0.0.1, not the server's own name, so it can't verify it. Use the built-in engine for this connection."))
         }
@@ -188,6 +189,9 @@ struct ExternalTool: Sendable {
         var arguments = try connectionArguments(connection)
         arguments += ["--binary-mode", "--comments", "--max-allowed-packet=1073741824", "--unbuffered"]
         if !stopOnError { arguments.append("--force") }
+        // MariaDB's client writes out a failed statement before its error, and
+        // a long one pushed the errors out of what `run` keeps.
+        if supports("print-query-on-error") { arguments.append("--skip-print-query-on-error") }
         if let database { arguments.append("--database=\(database)") }
         return arguments
     }

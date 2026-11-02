@@ -307,8 +307,9 @@ class BackupRoundTripTests: XCTestCase {
         // The corpus has FLOAT columns: the dialog warns about them on MariaDB.
         let isMariaDB = await service.serverVersion?.contains("MariaDB") ?? false
         XCTAssertEqual(viewModel.externalToolRoundsFloats, isMariaDB)
-        // The file is mysqldump's, not the built-in engine's.
-        let header = try FileHandle(forReadingFrom: dumpURL).read(upToCount: 40) ?? Data()
+        // The file is mysqldump's, not the built-in engine's. MariaDB's
+        // starts with a line that puts the client in sandbox mode.
+        let header = try FileHandle(forReadingFrom: dumpURL).read(upToCount: 200) ?? Data()
         XCTAssertTrue(String(decoding: header, as: UTF8.self).contains(" dump "), String(decoding: header, as: UTF8.self))
     }
 
