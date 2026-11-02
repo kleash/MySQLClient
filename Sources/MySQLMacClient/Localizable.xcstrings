@@ -12,104 +12,104 @@
       "localizations": {
         "ar": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "يأخذ %@ نسخة احتياطية من قاعدة البيانات بالكامل: كل الجداول والعروض والإجراءات والدوال والمشغّلات والأحداث، مقروءةً من لقطة واحدة متسقة دون قفل الجداول."
+            "state": "translated",
+            "value": "يأخذ %@ نسخة احتياطية من قاعدة البيانات بالكامل: كل الجداول والعروض والإجراءات والدوال والمشغّلات والأحداث، مقروءةً دون قفل الجداول، من لقطة واحدة متسقة لجداول InnoDB فيها."
           }
         },
         "de": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "%@ sichert die gesamte Datenbank: alle Tabellen, Ansichten, Routinen, Trigger und Ereignisse, gelesen aus einem einzigen konsistenten Snapshot, ohne Tabellen zu sperren."
+            "state": "translated",
+            "value": "%@ sichert die gesamte Datenbank: alle Tabellen, Ansichten, Routinen, Trigger und Ereignisse, gelesen, ohne Tabellen zu sperren, aus einem einzigen konsistenten Snapshot ihrer InnoDB-Tabellen."
           }
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "%@ hace una copia de seguridad de toda la base de datos: todas las tablas, vistas, rutinas, disparadores y eventos, leídos de una única instantánea coherente sin bloquear las tablas."
+            "state": "translated",
+            "value": "%@ hace una copia de seguridad de toda la base de datos: todas las tablas, vistas, rutinas, disparadores y eventos, leídos sin bloquear las tablas, a partir de una única instantánea coherente de sus tablas InnoDB."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "%@ sauvegarde toute la base de données : toutes les tables, vues, routines, triggers et événements, lus depuis un seul instantané cohérent, sans verrouiller les tables."
+            "state": "translated",
+            "value": "%@ sauvegarde toute la base de données : toutes les tables, vues, routines, triggers et événements, lus sans verrouiller les tables, depuis un seul instantané cohérent de ses tables InnoDB."
           }
         },
         "hi": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "%@ पूरे डेटाबेस का बैकअप लेता है: हर टेबल, व्यू, रूटीन, ट्रिगर और इवेंट, जिन्हें टेबल लॉक किए बिना एक ही सुसंगत स्नैपशॉट से पढ़ा जाता है।"
+            "state": "translated",
+            "value": "%@ पूरे डेटाबेस का बैकअप लेता है: हर टेबल, व्यू, रूटीन, ट्रिगर और इवेंट, जिन्हें टेबल लॉक किए बिना, उसकी InnoDB टेबलों के एक ही सुसंगत स्नैपशॉट से पढ़ा जाता है।"
           }
         },
         "id": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "%@ mencadangkan seluruh database: semua tabel, view, prosedur, fungsi, trigger, dan event, dibaca dari satu snapshot yang konsisten tanpa mengunci tabel."
+            "state": "translated",
+            "value": "%@ mencadangkan seluruh database: semua tabel, view, prosedur, fungsi, trigger, dan event, dibaca tanpa mengunci tabel, dari satu snapshot yang konsisten dari tabel InnoDB-nya."
           }
         },
         "it": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "%@ esegue il backup dell'intero database: tutte le tabelle, viste, routine, trigger ed eventi, letti da un unico snapshot coerente senza bloccare le tabelle."
+            "state": "translated",
+            "value": "%@ esegue il backup dell'intero database: tutte le tabelle, viste, routine, trigger ed eventi, letti senza bloccare le tabelle, da un unico snapshot coerente delle sue tabelle InnoDB."
           }
         },
         "ja": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "%@ はデータベース全体をバックアップします。すべてのテーブル、ビュー、ルーチン、トリガー、イベントを、テーブルをロックせずに一貫性のある 1 つのスナップショットから読み込みます。"
+            "state": "translated",
+            "value": "%@ はデータベース全体をバックアップします。すべてのテーブル、ビュー、ルーチン、トリガー、イベントを、テーブルをロックせずに、InnoDB テーブルを対象とした一貫性のある 1 つのスナップショットから読み込みます。"
           }
         },
         "ko": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "%@은(는) 데이터베이스 전체를 백업합니다. 모든 테이블, 뷰, 루틴, 트리거, 이벤트를 테이블을 잠그지 않고 일관된 하나의 스냅샷에서 읽습니다."
+            "state": "translated",
+            "value": "%@은(는) 데이터베이스 전체를 백업합니다. 모든 테이블, 뷰, 루틴, 트리거, 이벤트를 테이블을 잠그지 않고, InnoDB 테이블의 일관된 하나의 스냅샷에서 읽습니다."
           }
         },
         "pl": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "%@ tworzy kopię zapasową całej bazy danych: wszystkich tabel, widoków, procedur, funkcji, wyzwalaczy i zdarzeń, odczytanych z jednej spójnej migawki bez blokowania tabel."
+            "state": "translated",
+            "value": "%@ tworzy kopię zapasową całej bazy danych: wszystkich tabel, widoków, procedur, funkcji, wyzwalaczy i zdarzeń, odczytanych bez blokowania tabel z jednej spójnej migawki jej tabel InnoDB."
           }
         },
         "pt-BR": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "%@ faz o backup do banco de dados inteiro: todas as tabelas, views, rotinas, triggers e eventos, lidos de um único snapshot consistente, sem bloquear tabelas."
+            "state": "translated",
+            "value": "%@ faz o backup do banco de dados inteiro: todas as tabelas, views, rotinas, triggers e eventos, lidos sem bloquear tabelas, de um único snapshot consistente das suas tabelas InnoDB."
           }
         },
         "ru": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "%@ создаёт резервную копию всей базы данных: всех таблиц, представлений, процедур, функций, триггеров и событий, прочитанных из одного согласованного снимка без блокировки таблиц."
+            "state": "translated",
+            "value": "%@ создаёт резервную копию всей базы данных: всех таблиц, представлений, процедур, функций, триггеров и событий, прочитанных без блокировки таблиц из одного согласованного снимка её таблиц InnoDB."
           }
         },
         "th": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "%@ สำรองข้อมูลทั้งฐานข้อมูล ทั้งตาราง มุมมอง รูทีน ทริกเกอร์ และอีเวนต์ทั้งหมด โดยอ่านจากสแนปช็อตเดียวที่สอดคล้องกันโดยไม่ล็อกตาราง"
+            "state": "translated",
+            "value": "%@ สำรองข้อมูลทั้งฐานข้อมูล ทั้งตาราง มุมมอง รูทีน ทริกเกอร์ และอีเวนต์ทั้งหมด โดยไม่ล็อกตาราง และอ่านจากสแนปช็อตเดียวที่สอดคล้องกันของตาราง InnoDB ในฐานข้อมูลนั้น"
           }
         },
         "tr": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "%@ veritabanının tamamını yedekler: tüm tabloları, view'ları, procedure ve function'ları, trigger'ları ve event'leri tabloları kilitlemeden tek bir tutarlı anlık görüntüden okur."
+            "state": "translated",
+            "value": "%@ veritabanının tamamını yedekler: tüm tabloları, view'ları, procedure ve function'ları, trigger'ları ve event'leri tabloları kilitlemeden, InnoDB tablolarının tek bir tutarlı anlık görüntüsünden okur."
           }
         },
         "vi": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "%@ sao lưu toàn bộ cơ sở dữ liệu: mọi bảng, khung nhìn, thủ tục, hàm, trình kích hoạt và sự kiện, được đọc từ cùng một ảnh chụp nhất quán mà không khóa bảng."
+            "state": "translated",
+            "value": "%@ sao lưu toàn bộ cơ sở dữ liệu: mọi bảng, khung nhìn, thủ tục, hàm, trình kích hoạt và sự kiện, được đọc mà không khóa bảng, từ cùng một ảnh chụp nhất quán của các bảng InnoDB trong đó."
           }
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "%@ 会备份整个数据库：所有表、视图、例程、触发器和事件，均从同一个一致的快照中读取，且不锁定表。"
+            "state": "translated",
+            "value": "%@ 会备份整个数据库：所有表、视图、例程、触发器和事件，均在不锁定表的情况下，从其 InnoDB 表的同一个一致快照中读取。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "%@ 會備份整個資料庫：所有表格、檢視表、常式、觸發器和事件，皆從同一個一致的快照讀取，且不鎖定表格。"
+            "state": "translated",
+            "value": "%@ 會備份整個資料庫：所有表格、檢視表、常式、觸發器和事件，皆在不鎖定表格的情況下，從其 InnoDB 表格的同一個一致快照讀取。"
           }
         }
       }
@@ -324,6 +324,113 @@
           "stringUnit": {
             "state": "translated",
             "value": "%@ 沒有強制使用加密連線的選項，因此可能以未加密方式連線。請為此連線使用內建引擎。"
+          }
+        }
+      }
+    },
+    "%@ reported %lld failed statements; it restored every other statement. Its first 100 messages:\n%@": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "أبلغ %@ عن %lld عبارة فاشلة؛ تمت استعادة كل العبارات الأخرى. أول 100 من رسائله:\n%@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ hat %lld fehlgeschlagene Anweisungen gemeldet; alle anderen Anweisungen wurden wiederhergestellt. Die ersten 100 Meldungen:\n%@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ informó de %lld sentencias fallidas; todas las demás sentencias se restauraron. Sus primeros 100 mensajes:\n%@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ a signalé %lld instructions en échec ; toutes les autres instructions ont été restaurées. Ses 100 premiers messages :\n%@"
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ ने %lld विफल स्टेटमेंट बताए; बाकी सभी स्टेटमेंट रीस्टोर हो गए। उसके पहले 100 संदेश:\n%@"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ melaporkan %lld pernyataan gagal; semua pernyataan lain telah dipulihkan. 100 pesan pertamanya:\n%@"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ ha segnalato %lld istruzioni non riuscite; tutte le altre istruzioni sono state ripristinate. I suoi primi 100 messaggi:\n%@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ は %lld 件の文が失敗したと報告しました。その他の文はすべて復元されています。最初の 100 件のメッセージ:\n%@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@에서 실패한 문 %lld개를 보고했습니다. 나머지 문은 모두 복원되었습니다. 처음 100개 메시지:\n%@"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ zgłosił nieudane instrukcje (%lld); wszystkie pozostałe instrukcje zostały przywrócone. Pierwsze 100 komunikatów:\n%@"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ relatou %lld instruções com falha; todas as outras instruções foram restauradas. Suas primeiras 100 mensagens:\n%@"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ сообщил о неудачных операторах (%lld); все остальные операторы восстановлены. Первые 100 сообщений:\n%@"
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ รายงานว่ามี %lld คำสั่งที่ล้มเหลว คำสั่งอื่นทั้งหมดถูกกู้คืนแล้ว ข้อความ 100 รายการแรก:\n%@"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@, %lld başarısız ifade bildirdi; diğer tüm ifadeler geri yüklendi. İlk 100 mesaj:\n%@"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ đã báo %lld câu lệnh lỗi; mọi câu lệnh khác đã được khôi phục. 100 thông báo đầu tiên:\n%@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 报告有 %lld 条语句失败；其他所有语句均已恢复。前 100 条消息：\n%@"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 回報有 %lld 個陳述式失敗；其他所有陳述式皆已還原。前 100 則訊息：\n%@"
           }
         }
       }
@@ -39244,6 +39351,113 @@
           "stringUnit": {
             "state": "translated",
             "value": "無法接受此訊息。請檢查後再試一次。"
+          }
+        }
+      }
+    },
+    "The mysql client follows the file's own USE statements: turn on \"Use the database named in the file\" to restore with it.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "يتبع عميل mysql عبارات USE الموجودة في الملف نفسه: للاستعادة باستخدامه، فعّل \"استخدام قاعدة البيانات المذكورة في الملف\"."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Der mysql-Client folgt den eigenen USE-Anweisungen der Datei: Um mit ihm wiederherzustellen, aktivieren Sie „Die in der Datei genannte Datenbank verwenden“."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El cliente mysql sigue las propias sentencias USE del archivo: para restaurar con él, activa «Usar la base de datos indicada en el archivo»."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le client mysql suit les instructions USE du fichier lui-même : pour restaurer avec ce client, activez « Utiliser la base de données nommée dans le fichier »."
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "mysql क्लाइंट फ़ाइल के अपने USE स्टेटमेंट का पालन करता है: इससे रीस्टोर करने के लिए \"फ़ाइल में बताए गए डेटाबेस का उपयोग करें\" चालू करें।"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Klien mysql mengikuti pernyataan USE milik file itu sendiri: untuk memulihkan dengan klien ini, aktifkan \"Gunakan database yang disebut dalam file\"."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il client mysql segue le istruzioni USE del file stesso: per ripristinare con questo client, attiva \"Usa il database indicato nel file\"."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "mysql クライアントはファイル自体の USE 文に従います。このクライアントで復元するには、「ファイルに書かれたデータベースを使う」をオンにしてください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "mysql 클라이언트는 파일 자체의 USE 문을 따릅니다. 이 클라이언트로 복원하려면 \"파일에 지정된 데이터베이스 사용\"을 켜세요."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Klient mysql stosuje się do instrukcji USE zawartych w samym pliku: aby przywracać za pomocą tego klienta, włącz „Użyj bazy danych wskazanej w pliku”."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O cliente mysql segue as próprias instruções USE do arquivo: para restaurar com ele, ative \"Usar o banco de dados indicado no arquivo\"."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Клиент mysql следует операторам USE из самого файла: чтобы восстанавливать с его помощью, включите «Использовать базу данных, указанную в файле»."
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ไคลเอนต์ mysql ทำตามคำสั่ง USE ในไฟล์เอง หากต้องการกู้คืนด้วยไคลเอนต์นี้ ให้เปิด \"ใช้ฐานข้อมูลที่ระบุในไฟล์\""
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "mysql istemcisi dosyanın kendi USE ifadelerine uyar: onunla geri yüklemek için “Dosyada adı geçen veritabanını kullan” seçeneğini açın."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trình khách mysql làm theo các câu lệnh USE của chính tệp: để khôi phục bằng trình khách này, hãy bật \"Dùng cơ sở dữ liệu ghi trong tệp\"."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "mysql 客户端会遵循文件自身的 USE 语句：要用它恢复，请打开“使用文件中指定的数据库”。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "mysql 用戶端會遵循檔案本身的 USE 陳述式：若要用它還原，請開啟「使用檔案中指定的資料庫」。"
           }
         }
       }
