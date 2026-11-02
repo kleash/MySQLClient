@@ -48,7 +48,8 @@ enum HTTPProxyConnector {
                 throw error
             }
             let headText = String(decoding: answer.head.prefix(answer.bodyStart), as: UTF8.self)
-            let statusLine = String(headText.prefix { $0 != "\r" && $0 != "\n" })
+            // "\r\n" is one Character, neither "\r" nor "\n".
+            let statusLine = String(headText.prefix { !$0.isNewline })
             let code = statusLine.split(separator: " ").dropFirst().first.flatMap { Int($0) } ?? 0
             if (200..<300).contains(code), statusLine.hasPrefix("HTTP/") {
                 // A CONNECT answer has no body: anything past its empty line
@@ -205,7 +206,8 @@ enum HTTPProxyConnector {
             error = errno
             close(fd)
         }
-        throw Failure(message: String(localized: "Can't connect to the proxy \(host):\(port): \(String(cString: strerror(error)))"))
+        // String(port): an Int would be shown with digit grouping (3,128).
+        throw Failure(message: String(localized: "Can't connect to the proxy \(host):\(String(port)): \(String(cString: strerror(error)))"))
     }
 
     static func writeAll(_ fd: Int32, _ bytes: UnsafeRawBufferPointer) -> Bool {

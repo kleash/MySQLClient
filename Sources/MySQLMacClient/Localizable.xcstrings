@@ -5503,109 +5503,109 @@
         }
       }
     },
-    "Can't connect to the proxy %@:%lld: %@": {
+    "Can't connect to the proxy %@:%@: %@": {
       "extractionState": "manual",
       "localizations": {
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "تعذّر الاتصال بالوكيل %@:%lld: %@"
+            "value": "تعذّر الاتصال بالوكيل %@:%@: %@"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Verbindung zum Proxy %@:%lld fehlgeschlagen: %@"
+            "value": "Verbindung zum Proxy %@:%@ fehlgeschlagen: %@"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "No se pudo conectar al proxy %@:%lld: %@"
+            "value": "No se pudo conectar al proxy %@:%@: %@"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Impossible de se connecter au proxy %@:%lld : %@"
+            "value": "Impossible de se connecter au proxy %@:%@ : %@"
           }
         },
         "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "प्रॉक्सी %@:%lld से कनेक्ट नहीं हो सका: %@"
+            "value": "प्रॉक्सी %@:%@ से कनेक्ट नहीं हो सका: %@"
           }
         },
         "id": {
           "stringUnit": {
             "state": "translated",
-            "value": "Tidak dapat menyambung ke proxy %@:%lld: %@"
+            "value": "Tidak dapat menyambung ke proxy %@:%@: %@"
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Impossibile connettersi al proxy %@:%lld: %@"
+            "value": "Impossibile connettersi al proxy %@:%@: %@"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "プロキシ %@:%lld に接続できませんでした: %@"
+            "value": "プロキシ %@:%@ に接続できませんでした: %@"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "프록시 %@:%lld에 연결할 수 없습니다: %@"
+            "value": "프록시 %@:%@에 연결할 수 없습니다: %@"
           }
         },
         "pl": {
           "stringUnit": {
             "state": "translated",
-            "value": "Nie udało się połączyć z serwerem proxy %@:%lld: %@"
+            "value": "Nie udało się połączyć z serwerem proxy %@:%@: %@"
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Não foi possível conectar ao proxy %@:%lld: %@"
+            "value": "Não foi possível conectar ao proxy %@:%@: %@"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Не удалось подключиться к прокси-серверу %@:%lld: %@"
+            "value": "Не удалось подключиться к прокси-серверу %@:%@: %@"
           }
         },
         "th": {
           "stringUnit": {
             "state": "translated",
-            "value": "เชื่อมต่อกับพร็อกซี %@:%lld ไม่สำเร็จ: %@"
+            "value": "เชื่อมต่อกับพร็อกซี %@:%@ ไม่สำเร็จ: %@"
           }
         },
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@:%lld proxy sunucusuna bağlanılamadı: %@"
+            "value": "%@:%@ proxy sunucusuna bağlanılamadı: %@"
           }
         },
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Không thể kết nối tới proxy %@:%lld: %@"
+            "value": "Không thể kết nối tới proxy %@:%@: %@"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "无法连接到代理服务器 %@:%lld：%@"
+            "value": "无法连接到代理服务器 %@:%@：%@"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "無法連線到代理伺服器 %@:%lld：%@"
+            "value": "無法連線到代理伺服器 %@:%@：%@"
           }
         }
       }

@@ -90,6 +90,7 @@ final class SSHTunnelTests: XCTestCase {
         } catch let failure as SSHTunnel.Failure {
             // tinyproxy answers a wrong login with 401, others with 407 again.
             XCTAssertTrue(failure.message.contains("The proxy refused the connection to ssh:22"), failure.message)
+            XCTAssertFalse(failure.message.contains(where: \.isNewline), "more than the proxy's status line: \(failure.message)")
         }
     }
 
@@ -219,5 +220,15 @@ final class SSHTunnelArgumentTests: XCTestCase {
         let header = HTTPProxyConnector.digest(challenge, username: "Mufasa", password: "Circle Of Life", uri: "/dir/index.html",
                                                cnonce: "0a4f113b", method: "GET")
         XCTAssertTrue(header?.contains(#"response="6629fae49393a05397450978507c4ef1""#) ?? false, header ?? "nil")
+    }
+
+    /// RFC 7616's SHA-256 example (section 3.9.1).
+    func testDigestAnswerMatchesTheRFC7616SHA256Example() {
+        let challenge = ["realm": "http-auth@example.org", "qop": "auth, auth-int", "algorithm": "SHA-256",
+                         "nonce": "7ypf/xlj9XXwfDPEoM4URrv/xwf94BcCAzFZH4GiTo0v", "opaque": "FQhe/qaU925kfnzjCev0ciny7QMkPqMAFRtzCUYo5tdS"]
+        let header = HTTPProxyConnector.digest(challenge, username: "Mufasa", password: "Circle of Life", uri: "/dir/index.html",
+                                               cnonce: "f2/wE4q74E6zIJEtWaHKaf5wv/H5QzzpXusqGemxURZJ", method: "GET")
+        XCTAssertTrue(header?.contains(#"response="753927fa0e85d155564e2e272a28d1802ca10daf4496794697cf8db5856cb6c1""#) ?? false,
+                      header ?? "nil")
     }
 }
