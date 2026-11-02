@@ -71,6 +71,30 @@ final class SSHTunnelTests: XCTestCase {
             .write(to: sshFolder.appendingPathComponent("known_hosts"), atomically: true, encoding: .utf8)
     }
 
+    /// A form for the private database through the SSH server behind the
+    /// proxy, that saves no password to the Keychain.
+    @MainActor
+    private func filledForm(_ store: ConnectionStore) -> ConnectionFormViewModel {
+        let form = ConnectionFormViewModel(connectionStore: store)
+        form.sshFolder = sshFolder
+        form.name = "Private"
+        form.host = "private-mariadb"
+        form.port = "3306"
+        form.username = "root"
+        form.savePassword = false
+        form.usesSSH = true
+        form.sshHost = behindProxy.host
+        form.sshPort = String(behindProxy.port)
+        form.sshUsername = behindProxy.username
+        form.sshKeyFile = behindProxy.keyFile
+        form.usesProxy = true
+        form.proxyHost = "127.0.0.1"
+        form.proxyPort = environment["MYSQL_TEST_PROXY_PORT"]!
+        form.proxyUsername = "proxyuser"
+        form.proxyPassword = "proxy-test-password"
+        return form
+    }
+
     func testReachesADatabaseOnlyTheSSHServerCanReach() async throws {
         let service = try await connect(direct)
         try await assertReachesThePrivateDatabase(service)
@@ -174,22 +198,7 @@ final class SSHTunnelTests: XCTestCase {
     @MainActor
     func testConnectionFormConnectsThroughSSHAndTheProxy() async throws {
         let store = ConnectionStore(fileURL: sshFolder.appendingPathComponent("connections.json"))
-        let form = ConnectionFormViewModel(connectionStore: store)
-        form.sshFolder = sshFolder
-        form.host = "private-mariadb"
-        form.port = "3306"
-        form.username = "root"
-        form.savePassword = false  // nothing to the Keychain
-        form.usesSSH = true
-        form.sshHost = behindProxy.host
-        form.sshPort = String(behindProxy.port)
-        form.sshUsername = behindProxy.username
-        form.sshKeyFile = behindProxy.keyFile
-        form.usesProxy = true
-        form.proxyHost = "127.0.0.1"
-        form.proxyPort = environment["MYSQL_TEST_PROXY_PORT"]!
-        form.proxyUsername = "proxyuser"
-        form.proxyPassword = "proxy-test-password"
+        let form = filledForm(store)
 
         let connected = await form.connect()
         let session = try XCTUnwrap(connected, form.errorMessage ?? "")
@@ -198,6 +207,34 @@ final class SSHTunnelTests: XCTestCase {
         let rows = try await session.mysqlService.textQuery("SELECT 1 + 1 AS two")
         XCTAssertEqual(rows.first?.column("two")?.string, "2")
         XCTAssertEqual(store.connections.first?.ssh, behindProxy)
+    }
+
+    /// Picking another saved connection while one connects (here while its
+    /// tunnel opens) changes the form, not the connection under way: that
+    /// logs in, and is saved, as the form was when Connect was clicked.
+    @MainActor
+    func testConnectingKeepsTheFormAsItWasWhenConnectWasClicked() async throws {
+        let store = ConnectionStore(fileURL: sshFolder.appendingPathComponent("connections.json"))
+        let other = ConnectionProfile(name: "Other", host: "other.invalid", port: 3307, username: "other", database: "other")
+        store.add(other)
+        let form = filledForm(store)
+
+        let connecting = Task { await form.connect() }
+        try await Task.sleep(for: .milliseconds(50))
+        XCTAssertTrue(form.isConnecting)
+        form.loadForEditing(other)
+        let connected = await connecting.value
+        let session = try XCTUnwrap(connected, form.errorMessage ?? "")
+        tunnel = session.tunnel
+        service = session.mysqlService
+        XCTAssertEqual(session.profile.name, "Private")
+        XCTAssertEqual(session.profile.host, "private-mariadb")
+        XCTAssertEqual(session.profile.username, "root")
+        XCTAssertEqual(session.profile.ssh, behindProxy)
+        XCTAssertEqual(store.connections.first { $0.id == other.id }, other)
+        XCTAssertEqual(form.editingProfileId, other.id)
+        let rows = try await session.mysqlService.textQuery("SELECT CURRENT_USER() AS user")
+        XCTAssertEqual(rows.first?.column("user")?.string?.hasPrefix("root@"), true)
     }
 }
 

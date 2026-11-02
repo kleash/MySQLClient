@@ -126,8 +126,13 @@ final class ConnectionFormViewModel: ObservableObject {
         isConnecting = true
         defer { isConnecting = false }
 
+        // The form as it is now: by the time the tunnel is open it can show
+        // another saved connection, whose fields mustn't log in or be saved
+        // as this one.
         let trimmedDatabase = database.trimmingCharacters(in: .whitespaces)
         let ssh = sshSettings
+        let name = name, host = host, username = username, password = password, savePassword = savePassword
+        let note = note, tlsMode = tlsMode, proxyPassword = proxyPassword, profileId = editingProfileId
         let service = MySQLService()
         var tunnel: SSHTunnel?
         do {
@@ -160,7 +165,7 @@ final class ConnectionFormViewModel: ObservableObject {
 
         let trimmedNote = note.trimmingCharacters(in: .whitespacesAndNewlines)
         let profile = ConnectionProfile(
-            id: editingProfileId ?? UUID(),
+            id: profileId ?? UUID(),
             name: name.isEmpty ? "\(username)@\(host)" : name,
             host: host,
             port: portNumber,
@@ -172,21 +177,22 @@ final class ConnectionFormViewModel: ObservableObject {
         )
         if savePassword {
             try? keychainService.savePassword(password, forConnectionId: profile.id)
-        } else if editingProfileId != nil {
+        } else if profileId != nil {
             try? keychainService.deletePassword(forConnectionId: profile.id)
         }
         // The proxy's password goes with the database's: saved or not.
         if savePassword, ssh?.proxy != nil, !proxyPassword.isEmpty {
             try? keychainService.savePassword(proxyPassword, forConnectionId: profile.id, item: KeychainService.proxyPasswordItem)
-        } else if editingProfileId != nil {
+        } else if profileId != nil {
             try? keychainService.deletePassword(forConnectionId: profile.id, item: KeychainService.proxyPasswordItem)
         }
-        if editingProfileId != nil {
+        if profileId != nil {
             connectionStore.update(profile)
         } else {
             connectionStore.add(profile)
         }
-        editingProfileId = profile.id
+        // Unless the form has moved on to another connection meanwhile.
+        if editingProfileId == profileId { editingProfileId = profile.id }
 
         return AppSession(
             profile: profile,
