@@ -104,9 +104,8 @@ final class ExternalToolTests: XCTestCase {
         XCTAssertTrue(arguments.contains { $0.hasPrefix("--max-allowed-packet=") })
         XCTAssertFalse(arguments.contains("--force"))
 
-        let carryingOn = try mysql.restoreArguments(database: nil, stopOnError: false, connection: connection())
+        let carryingOn = try mysql.restoreArguments(database: "shop", stopOnError: false, connection: connection())
         XCTAssertTrue(carryingOn.contains("--force"))
-        XCTAssertFalse(carryingOn.contains { $0.hasPrefix("--database") }, "the file's own USE decides")
 
         // MariaDB's client writes out each failed statement before its error.
         XCTAssertTrue(try mariadb.restoreArguments(database: "shop", stopOnError: false, connection: connection()).contains("--skip-print-query-on-error"))
@@ -134,7 +133,7 @@ final class ExternalToolTests: XCTestCase {
         // Through a tunnel the tool would check the certificate against 127.0.0.1.
         XCTAssertThrowsError(try mysqldump.dumpArguments(database: "shop", connection: connection(tls: .verifyCertificate, serverName: "db.example.com")))
         let noTLSOptions = ExternalTool(url: mysql.url, help: "  --force")
-        XCTAssertThrowsError(try noTLSOptions.restoreArguments(database: nil, stopOnError: true, connection: connection(tls: .required)))
+        XCTAssertThrowsError(try noTLSOptions.restoreArguments(database: "shop", stopOnError: true, connection: connection(tls: .required)))
     }
 
     /// The option file's own quoting (MySQL's and MariaDB's `my_default`):

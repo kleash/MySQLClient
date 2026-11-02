@@ -104,7 +104,7 @@ class BackupRoundTripTests: XCTestCase {
     func testBackupRestoredWithTheAppIntoAnotherDatabaseMatchesTheOriginal() async throws {
         let before = try await fingerprint(of: database)
         try await backUp()
-        try await assertRestoredCopyMatches(before, usesExternalTool: false)
+        try await assertRestoredCopyMatches(before)
     }
 
     /// Each page of a composite key is read as a range of the key's index:
@@ -173,40 +173,44 @@ class BackupRoundTripTests: XCTestCase {
         try await dropWhatMysqldumpLoses()
         let before = try await fingerprint(of: database)
         try await backUpWithMysqldump()
-        _ = try await service.rawQuery("DROP DATABASE `\(database)`")
-        try await restoreWithTheApp(into: database, usesExternalTool: true, useDatabaseNamedInFile: true)
+        try await recreateWithTheMysqlClient()
 
         assertSame(await mysqldumpKeeps(try await fingerprint(of: database)), await mysqldumpKeeps(before))
-    }
-
-    func testMysqldumpBackupRestoredWithTheMysqlClientIntoAnotherDatabaseMatches() async throws {
-        try await dropWhatMysqldumpLoses()
-        let before = try await fingerprint(of: database)
-        try await backUpWithMysqldump()
-        try await assertRestoredCopyMatches(before, usesExternalTool: true, madeWithMysqldump: true)
     }
 
     func testMysqldumpBackupRestoredWithTheAppIntoAnotherDatabaseMatches() async throws {
         try await dropWhatMysqldumpLoses()
         let before = try await fingerprint(of: database)
         try await backUpWithMysqldump()
-        try await assertRestoredCopyMatches(before, usesExternalTool: false, madeWithMysqldump: true)
+        try await assertRestoredCopyMatches(before, madeWithMysqldump: true)
     }
 
-    func testBackupRestoredWithTheMysqlClientIntoAnotherDatabaseMatches() async throws {
+    func testBackupRestoredWithTheMysqlClientRecreatesTheDatabase() async throws {
         let before = try await fingerprint(of: database)
         try await backUp()
-        try await assertRestoredCopyMatches(before, usesExternalTool: true)
+        try await recreateWithTheMysqlClient()
+
+        assertSame(try await fingerprint(of: database), before)
     }
 
-    /// Restores the backup into a new database next to the original, made
-    /// with the server's defaults, with the dialog's defaults (the file's own
-    /// USE and CREATE DATABASE skipped, its character set and collation given
-    /// to the copy), and compares both with `before`.
-    private func assertRestoredCopyMatches(_ before: [String: String], usesExternalTool: Bool, madeWithMysqldump: Bool = false,
+    /// Drops the database and has the mysql client run the backup as it is,
+    /// from the sheet of another database (the sheet always opens on one
+    /// that exists): the file's own CREATE DATABASE and USE bring it back.
+    private func recreateWithTheMysqlClient() async throws {
+        _ = try await service.rawQuery("DROP DATABASE `\(database)`")
+        _ = try await service.rawQuery("CREATE DATABASE `\(copy)`")
+        try await restoreWithTheApp(into: copy, usesExternalTool: true, useDatabaseNamedInFile: true)
+    }
+
+    /// Restores the backup with the built-in engine into a new database next
+    /// to the original, made with the server's defaults, with the dialog's
+    /// defaults (the file's own USE and CREATE DATABASE skipped, its
+    /// character set and collation given to the copy), and compares both
+    /// with `before`.
+    private func assertRestoredCopyMatches(_ before: [String: String], madeWithMysqldump: Bool = false,
                                            file: StaticString = #filePath, line: UInt = #line) async throws {
         _ = try await service.rawQuery("CREATE DATABASE `\(copy)`")
-        try await restoreWithTheApp(into: copy, usesExternalTool: usesExternalTool)
+        try await restoreWithTheApp(into: copy, usesExternalTool: false)
 
         assertSame(try await fingerprint(of: database), before, file: file, line: line)
         var restored = try await fingerprint(of: copy)

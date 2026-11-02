@@ -89,10 +89,13 @@ struct DatabaseRestoreView: View {
             .pickerStyle(.segmented)
             .labelsHidden()
             .frame(maxWidth: 240)
-            .disabled(viewModel.isRunning || !ExternalTool.isAvailable)
+            // All of it: a segmented picker ignores `.disabled` on one segment.
+            .disabled(viewModel.isRunning || !ExternalTool.isAvailable || !viewModel.useDatabaseNamedInFile)
             Group {
                 if !ExternalTool.isAvailable {
                     Text("The App Sandbox keeps this build from running command-line tools installed outside the app.")
+                } else if !viewModel.useDatabaseNamedInFile {
+                    Text("The mysql client follows the file's own USE statements: turn on \"Use the database named in the file\" to restore with it.")
                 } else if viewModel.usesExternalTool, let toolURL = viewModel.externalToolURL {
                     Text(verbatim: toolURL.path)
                         .font(.system(size: 12, design: .monospaced))

@@ -184,14 +184,15 @@ struct ExternalTool: Sendable {
     /// body), and a statement may be as big as the server takes. What it
     /// prints is written out after each statement, where
     /// `DatabaseRestoreViewModel.pass` waits for the answers it asks for.
-    func restoreArguments(database: String?, stopOnError: Bool, connection: Connection) throws -> [String] {
+    /// It starts in `database`, as `mysql <database> < file` does.
+    func restoreArguments(database: String, stopOnError: Bool, connection: Connection) throws -> [String] {
         var arguments = try connectionArguments(connection)
         arguments += ["--binary-mode", "--comments", "--max-allowed-packet=1073741824", "--unbuffered"]
         if !stopOnError { arguments.append("--force") }
         // MariaDB's client writes out a failed statement before its error, and
         // a long one pushed the errors out of what `run` keeps.
         if supports("print-query-on-error") { arguments.append("--skip-print-query-on-error") }
-        if let database { arguments.append("--database=\(database)") }
+        arguments.append("--database=\(database)")
         return arguments
     }
 

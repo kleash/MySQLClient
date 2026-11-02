@@ -74,10 +74,13 @@ final class DatabaseRestoreViewModel: ObservableObject {
     /// collation its CREATE and ALTER DATABASE set go to `database` instead
     /// (`intoChosenDatabase`). On: the file decides, starting in `database`,
     /// as `mysql <database> < file` would.
-    @Published var useDatabaseNamedInFile = false
+    @Published var useDatabaseNamedInFile = false {
+        didSet { if !useDatabaseNamedInFile { usesExternalTool = false } }
+    }
     @Published var stopOnFirstError = true
     /// Restore with the mysql client (or mariadb) instead of the built-in
-    /// engine, with the same two options.
+    /// engine. Only with `useDatabaseNamedInFile` on, and turned off with
+    /// it: the client runs the file as it is, its USE statements too.
     @Published var usesExternalTool = false
     /// The client that runs then (`locateExternalTool`), and once it has run,
     /// the one that did; nil if there's none.
@@ -138,7 +141,7 @@ final class DatabaseRestoreViewModel: ObservableObject {
     /// as do its routines, triggers and events (mysqldump sets the database
     /// collation each was made under around it), and the original keeps
     /// its own. Anything else runs as it is.
-    nonisolated static func intoChosenDatabase(_ statement: String) -> String? {
+    static func intoChosenDatabase(_ statement: String) -> String? {
         guard let match = statement.prefixMatch(of: databaseStatement) else { return statement }
         let verb = match.verb?.uppercased() ?? "USE"
         if verb == "ALTER", match.name == nil { return statement }
@@ -148,15 +151,13 @@ final class DatabaseRestoreViewModel: ObservableObject {
     }
 
     /// The database a USE, CREATE, DROP or ALTER DATABASE names, unquoted.
-    nonisolated static func databaseName(in statement: String) -> String? {
+    static func databaseName(in statement: String) -> String? {
         guard let name = statement.prefixMatch(of: databaseStatement)?.name else { return nil }
         guard let quote = name.first, quote == "`" || quote == "\"" else { return String(name) }
         return name.dropFirst().dropLast().replacingOccurrences(of: "\(quote)\(quote)", with: "\(quote)")
     }
 
-    // `pass` matches it off the main actor. Regex isn't Sendable, but it's
-    // safe to match with from any thread: it compiles itself once, atomically.
-    private nonisolated(unsafe) static let databaseStatement = #/
+    private static let databaseStatement = #/
         (?i) (?<opener> /\*!\d* \s* )?
         (?: USE \b
           | (?<verb> CREATE (?: \s+ OR \s+ REPLACE )? | DROP | ALTER ) \s+ (?: DATABASE | SCHEMA ) \b
@@ -287,6 +288,13 @@ final class DatabaseRestoreViewModel: ObservableObject {
     /// run cut short. With `--force` it carries on past errors and still
     /// ends with exit status 0, so they're found in what it says.
     private func restoreWithExternalTool(from inputFileURL: URL) async {
+        // Where the client splits the file unlike `DelimiterScript`, it runs
+        // a USE the built-in engine would skip, so it can't keep the file in
+        // `database`.
+        guard useDatabaseNamedInFile else {
+            errorMessage = String(localized: "The mysql client follows the file's own USE statements: turn on \"Use the database named in the file\" to restore with it.")
+            return
+        }
         let questionLines = ExternalTool.Locked<[Int]>([])
         do {
             let isMariaDB = await service.serverVersion?.contains("MariaDB") ?? false
@@ -294,18 +302,16 @@ final class DatabaseRestoreViewModel: ObservableObject {
                                                    preferMariaDB: isMariaDB)
             externalToolURL = tool.url
             let connection = try await service.externalToolConnection()
-            let arguments = try tool.restoreArguments(database: useDatabaseNamedInFile ? nil : database.name,
-                                                      stopOnError: stopOnFirstError, connection: connection)
+            let arguments = try tool.restoreArguments(database: database.name, stopOnError: stopOnFirstError, connection: connection)
             let totalBytes = Int64((try? inputFileURL.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0)
             progress = Progress(bytesRead: 0, totalBytes: totalBytes, statementsRun: 0)
-            let keepsDatabaseStatements = useDatabaseNamedInFile
             let chunkSize = readChunkSize
             let output = Pipe()
             let messages = Self.fileLines(in: try await tool.run(arguments, optionFile: connection.optionFile, input: { input in
                 // The client has its own copy by now: without this one, what
                 // `pass` reads ends when the client does.
                 try? output.fileHandleForWriting.close()
-                try Self.pass(inputFileURL, to: input, output: output.fileHandleForReading, keepingDatabaseStatements: keepsDatabaseStatements,
+                try Self.pass(inputFileURL, to: input, output: output.fileHandleForReading,
                               chunkSize: chunkSize, questionLines: questionLines) { sent in
                     Task { @MainActor in
                         guard self.isRunning else { return }
@@ -338,24 +344,21 @@ final class DatabaseRestoreViewModel: ObservableObject {
     }
 
     /// Writes the file to `input` up to the end of its last whole statement
-    /// read so far (where `DelimiterScript.scan` says that is), with the
-    /// file's own database statements turned to the chosen database unless
-    /// `keepingDatabaseStatements`, as the built-in engine turns them
-    /// (`intoChosenDatabase`): left out, or rewritten as an ALTER DATABASE
-    /// without the name, with as many line breaks as before, so the
-    /// client's "at line N" is still the file's line N. `progress` gets the
-    /// bytes read and statements sent, every megabyte and at the end.
+    /// read so far (where `DelimiterScript.scan` says that is). `progress`
+    /// gets the bytes read and statements sent, every megabyte and at the
+    /// end.
     ///
     /// The file is split the way the client's session reads backslashes,
     /// as `performRestore` splits it: the client is asked when it starts and
     /// after each statement that mentions sql_mode, by a SELECT whose answer
     /// comes back on `output`, its standard output. Split the other way, a
     /// string that a routine made under NO_BACKSLASH_ESCAPES ends with a
-    /// backslash ('C:\') hid the statements after it, a USE among them,
-    /// which the client then ran. The client runs a line only once it has
-    /// all of it, so each question takes two lines of its own, after the
-    /// line `questionLines` gets, as the client numbers it (`fileLines`).
-    nonisolated static func pass(_ fileURL: URL, to input: FileHandle, output: FileHandle, keepingDatabaseStatements: Bool,
+    /// backslash ('C:\') ran on into the statements after it, and what
+    /// `pass` puts between statements landed inside one. The client runs a
+    /// line only once it has all of it, so each question takes two lines of
+    /// its own, after the line `questionLines` gets, as the client numbers
+    /// it (`fileLines`).
+    nonisolated static func pass(_ fileURL: URL, to input: FileHandle, output: FileHandle,
                                  chunkSize: Int, questionLines: ExternalTool.Locked<[Int]>, progress: (Progress) -> Void) throws {
         let file = try FileHandle(forReadingFrom: fileURL)
         defer { try? file.close() }
@@ -402,7 +405,6 @@ final class DatabaseRestoreViewModel: ObservableObject {
         var readSize = chunkSize
         var reachedEnd = false
         var asked = false
-        var filesDatabase: String?
         repeat {
             // After a statement that mentions sql_mode, what's left is split
             // the way the client now reads backslashes, before more is read.
@@ -413,33 +415,7 @@ final class DatabaseRestoreViewModel: ObservableObject {
                 sent.bytesRead += Int64(chunk.count)
             }
             let scanned = DelimiterScript.scan(pending, from: state, isFinal: reachedEnd, stopsAfterSQLMode: true)
-            var whole: [UInt8] = []
-            var copied = 0
-            for statement in scanned.statements where !keepingDatabaseStatements {
-                let original = pending[statement.range]
-                let sql = String(decoding: original, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
-                if let name = databaseName(in: sql) {
-                    // As in `performRestore`: a second database would land
-                    // on the first one's tables. What's before it still runs.
-                    if let filesDatabase, name != filesDatabase {
-                        try input.write(contentsOf: whole + pending[copied..<statement.range.lowerBound])
-                        throw RestoreError.moreThanOneDatabase(line: statement.line + 1)
-                    }
-                    filesDatabase = name
-                }
-                let replacement = intoChosenDatabase(sql)
-                guard replacement != sql else { continue }
-                // Left out, or rewritten, but only from bytes that are exactly
-                // the text read.
-                let rewritten = String(bytes: original, encoding: .utf8) == nil ? nil : replacement
-                let text = Array((rewritten ?? "").utf8)
-                let newline = UInt8(ascii: "\n")
-                let lineBreaks = original.count { $0 == newline } - text.count { $0 == newline }
-                whole += pending[copied..<statement.range.lowerBound] + text + Array(repeating: newline, count: lineBreaks)
-                copied = statement.range.upperBound
-            }
-            whole += pending[copied..<scanned.consumed]
-            try input.write(contentsOf: whole)
+            try input.write(contentsOf: pending[..<scanned.consumed])
             asked = scanned.statements.last.map { DelimiterScript.mentionsSQLMode(pending[$0.range]) } ?? false
             pending.removeFirst(scanned.consumed)
             state = scanned.state

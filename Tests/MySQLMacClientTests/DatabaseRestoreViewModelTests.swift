@@ -430,21 +430,53 @@ final class DatabaseRestoreViewModelTests: XCTestCase {
 
     // MARK: - With the mysql client
 
+    /// With "Use the database named in the file" on, the only way the
+    /// client restores, starting in the chosen database.
     private func restoreWithTheMysqlClient(_ contents: Data, configure: (DatabaseRestoreViewModel) -> Void = { _ in }) async throws -> DatabaseRestoreViewModel {
         guard ExternalTool.locate(.client, configuredPath: "", preferMariaDB: true) != nil else {
             throw XCTSkip("No mysql or mariadb client is installed.")
         }
         let viewModel = try await restore(contents) {
             $0.usesExternalTool = true
+            $0.useDatabaseNamedInFile = true
             configure($0)
         }
         XCTAssertNotNil(viewModel.externalToolURL, "the client must have run, not the built-in engine")
         return viewModel
     }
 
-    /// The file's own database statements are blanked out on the way to the
-    /// client, line breaks kept, so its error still names the file's line.
-    func testMysqlClientSkipsTheFilesOwnDatabaseStatementsAndKeepsTheirLines() async throws {
+    /// The client runs the file as it is, its USE included, and where its
+    /// split and the app's differ it ran one the app meant to skip: it can't
+    /// keep a file out of the database the file was made from. So it's
+    /// refused unless the file decides, before anything runs.
+    func testMysqlClientIsRefusedUnlessTheFileDecidesTheDatabase() async throws {
+        let sheet = DatabaseRestoreViewModel(service: service, database: DatabaseInfo(name: database))
+        sheet.useDatabaseNamedInFile = true
+        sheet.usesExternalTool = true
+        sheet.useDatabaseNamedInFile = false
+        XCTAssertFalse(sheet.usesExternalTool, "turning the option off turns the client off")
+
+        _ = try await service.rawQuery("CREATE DATABASE `\(other)`")
+        _ = try await service.rawQuery("CREATE TABLE `\(other)`.t (id INT PRIMARY KEY)")
+        _ = try await service.rawQuery("INSERT INTO `\(other)`.t VALUES (1)")
+        let viewModel = try await restore(Data("""
+            USE `\(other)`;
+            DROP TABLE IF EXISTS t;
+            CREATE TABLE t (id INT PRIMARY KEY);
+            INSERT INTO t VALUES (2);
+            """.utf8)) { $0.usesExternalTool = true }
+
+        XCTAssertTrue(viewModel.errorMessage?.contains("\"Use the database named in the file\"") ?? false, viewModel.errorMessage ?? "nil")
+        XCTAssertFalse(viewModel.didFinishSuccessfully)
+        let original = try await service.query("SELECT id FROM `\(other)`.t").compactMap { $0.column("id")?.int }
+        XCTAssertEqual(original, [1], "the file's own database must be left alone")
+        let tables = try await service.query("SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = '\(database)'")
+        XCTAssertTrue(tables.isEmpty, "nothing may run in the chosen one either")
+    }
+
+    /// The client follows the file's own database statements, and its error
+    /// still names the file's line.
+    func testMysqlClientFollowsTheFilesOwnDatabaseAndKeepsItsLines() async throws {
         let viewModel = try await restoreWithTheMysqlClient(Data("""
             /*!40000 DROP DATABASE IF EXISTS `\(other)`*/;
             CREATE DATABASE IF NOT EXISTS `\(other)`
@@ -458,10 +490,10 @@ final class DatabaseRestoreViewModelTests: XCTestCase {
 
         XCTAssertTrue(viewModel.errorMessage?.contains("at line 7") ?? false, viewModel.errorMessage ?? "nil")
         XCTAssertFalse(viewModel.didFinishSuccessfully)
-        let restored = try await ids(in: "t")
+        let restored = try await service.query("SELECT id FROM `\(other)`.t").compactMap { $0.column("id")?.int }
         XCTAssertEqual(restored, [7], "nothing after the failed statement may run")
-        let others = try await service.query("SELECT SCHEMA_NAME FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = '\(other)'")
-        XCTAssertTrue(others.isEmpty, "the file's own database must not be created")
+        let tables = try await service.query("SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = '\(database)'")
+        XCTAssertTrue(tables.isEmpty, "the file moved on from the chosen database")
     }
 
     /// The client stops at the error while megabytes of the file are still
@@ -517,14 +549,11 @@ final class DatabaseRestoreViewModelTests: XCTestCase {
 
     /// A trigger made under NO_BACKSLASH_ESCAPES ends a string with a
     /// backslash ('\'), which the client, told the mode by the server, reads
-    /// as the whole string. Split as if the backslash escaped the quote, the
-    /// file hid the USE after it inside one long statement, which reached the
-    /// client as it was: the rest went into the database the file was made
-    /// from. The error at the end still names the file's line, although the
-    /// client was asked for the mode four times, on lines of their own.
+    /// as the whole string. The file is split the same way, so what follows
+    /// reaches the client as the statements it is. The error at the end
+    /// still names the file's line, although the client was asked for the
+    /// mode four times, on lines of their own.
     func testMysqlClientReadsBackslashesTheWayItsSessionsSQLModeSays() async throws {
-        _ = try await service.rawQuery("CREATE DATABASE `\(other)`")
-        _ = try await service.rawQuery("CREATE TABLE `\(other)`.t (id INT PRIMARY KEY, path VARCHAR(20))")
         let viewModel = try await restoreWithTheMysqlClient(Data(#"""
             CREATE TABLE t (id INT PRIMARY KEY, path VARCHAR(20));
             /*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
@@ -533,41 +562,12 @@ final class DatabaseRestoreViewModelTests: XCTestCase {
             /*!50003 CREATE*/ /*!50017 DEFINER=CURRENT_USER*/ /*!50003 TRIGGER t_bi BEFORE INSERT ON t FOR EACH ROW SET NEW.path = REPLACE(NEW.path, '\', '/') */;;
             DELIMITER ;
             /*!50003 SET sql_mode              = @saved_sql_mode */ ;
-            USE `\#(other)`;
             INSERT INTO t VALUES (1, 'it''s');
             INSERT INTO t VALUES (1, 'again');
             """#.utf8)) { $0.readChunkSize = 7 }
 
-        XCTAssertTrue(viewModel.errorMessage?.contains("at line 10: Duplicate entry") ?? false, viewModel.errorMessage ?? "nil")
+        XCTAssertTrue(viewModel.errorMessage?.contains("at line 9: Duplicate entry") ?? false, viewModel.errorMessage ?? "nil")
         let restored = try await ids(in: "t")
         XCTAssertEqual(restored, [1])
-        let original = try await service.query("SELECT id FROM `\(other)`.t").compactMap { $0.column("id")?.int }
-        XCTAssertEqual(original, [], "the file's own database must be left alone")
-    }
-
-    /// As the built-in restore does: a file of several databases can't go
-    /// into one, where each database's DROP TABLE would replace the table
-    /// restored from the one before. It stops where the second one starts,
-    /// even when told to carry on past failed statements.
-    func testMysqlClientStopsWhereTheFileMovesOnToAnotherDatabase() async throws {
-        let second = "\(other)_b"
-        addTeardownBlock { [service] in _ = try? await service?.rawQuery("DROP DATABASE IF EXISTS `\(second)`") }
-        let viewModel = try await restoreWithTheMysqlClient(Data("""
-            CREATE DATABASE /*!32312 IF NOT EXISTS*/ `\(other)` /*!40100 DEFAULT CHARACTER SET latin1 COLLATE latin1_general_ci */;
-            USE `\(other)`;
-            DROP TABLE IF EXISTS `t`;
-            CREATE TABLE `t` (id INT PRIMARY KEY);
-            INSERT INTO `t` VALUES (1),(2);
-            CREATE DATABASE /*!32312 IF NOT EXISTS*/ `\(second)` /*!40100 DEFAULT CHARACTER SET utf8mb4 */;
-            USE `\(second)`;
-            DROP TABLE IF EXISTS `t`;
-            CREATE TABLE `t` (id INT PRIMARY KEY);
-            INSERT INTO `t` VALUES (3);
-            """.utf8)) { $0.stopOnFirstError = false }
-
-        XCTAssertEqual(viewModel.errorMessage, DatabaseRestoreViewModel.RestoreError.moreThanOneDatabase(line: 6).errorDescription)
-        XCTAssertFalse(viewModel.didFinishSuccessfully)
-        let restored = try await ids(in: "t")
-        XCTAssertEqual(restored, [1, 2])
     }
 }
