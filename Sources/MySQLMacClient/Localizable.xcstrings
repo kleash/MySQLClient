@@ -7,108 +7,108 @@
     "%@": {
       "extractionState": "manual"
     },
-    "%@ backs up the whole database: every table, view, routine, trigger and event, read from one consistent snapshot without locking tables.": {
+    "%@ backs up the whole database: every table, view, routine, trigger and event, read without locking tables, from one consistent snapshot of its InnoDB tables.": {
       "extractionState": "manual",
       "localizations": {
         "ar": {
           "stringUnit": {
-            "state": "translated",
+            "state": "needs_review",
             "value": "يأخذ %@ نسخة احتياطية من قاعدة البيانات بالكامل: كل الجداول والعروض والإجراءات والدوال والمشغّلات والأحداث، مقروءةً من لقطة واحدة متسقة دون قفل الجداول."
           }
         },
         "de": {
           "stringUnit": {
-            "state": "translated",
+            "state": "needs_review",
             "value": "%@ sichert die gesamte Datenbank: alle Tabellen, Ansichten, Routinen, Trigger und Ereignisse, gelesen aus einem einzigen konsistenten Snapshot, ohne Tabellen zu sperren."
           }
         },
         "es": {
           "stringUnit": {
-            "state": "translated",
+            "state": "needs_review",
             "value": "%@ hace una copia de seguridad de toda la base de datos: todas las tablas, vistas, rutinas, disparadores y eventos, leídos de una única instantánea coherente sin bloquear las tablas."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "translated",
+            "state": "needs_review",
             "value": "%@ sauvegarde toute la base de données : toutes les tables, vues, routines, triggers et événements, lus depuis un seul instantané cohérent, sans verrouiller les tables."
           }
         },
         "hi": {
           "stringUnit": {
-            "state": "translated",
+            "state": "needs_review",
             "value": "%@ पूरे डेटाबेस का बैकअप लेता है: हर टेबल, व्यू, रूटीन, ट्रिगर और इवेंट, जिन्हें टेबल लॉक किए बिना एक ही सुसंगत स्नैपशॉट से पढ़ा जाता है।"
           }
         },
         "id": {
           "stringUnit": {
-            "state": "translated",
+            "state": "needs_review",
             "value": "%@ mencadangkan seluruh database: semua tabel, view, prosedur, fungsi, trigger, dan event, dibaca dari satu snapshot yang konsisten tanpa mengunci tabel."
           }
         },
         "it": {
           "stringUnit": {
-            "state": "translated",
+            "state": "needs_review",
             "value": "%@ esegue il backup dell'intero database: tutte le tabelle, viste, routine, trigger ed eventi, letti da un unico snapshot coerente senza bloccare le tabelle."
           }
         },
         "ja": {
           "stringUnit": {
-            "state": "translated",
+            "state": "needs_review",
             "value": "%@ はデータベース全体をバックアップします。すべてのテーブル、ビュー、ルーチン、トリガー、イベントを、テーブルをロックせずに一貫性のある 1 つのスナップショットから読み込みます。"
           }
         },
         "ko": {
           "stringUnit": {
-            "state": "translated",
+            "state": "needs_review",
             "value": "%@은(는) 데이터베이스 전체를 백업합니다. 모든 테이블, 뷰, 루틴, 트리거, 이벤트를 테이블을 잠그지 않고 일관된 하나의 스냅샷에서 읽습니다."
           }
         },
         "pl": {
           "stringUnit": {
-            "state": "translated",
+            "state": "needs_review",
             "value": "%@ tworzy kopię zapasową całej bazy danych: wszystkich tabel, widoków, procedur, funkcji, wyzwalaczy i zdarzeń, odczytanych z jednej spójnej migawki bez blokowania tabel."
           }
         },
         "pt-BR": {
           "stringUnit": {
-            "state": "translated",
+            "state": "needs_review",
             "value": "%@ faz o backup do banco de dados inteiro: todas as tabelas, views, rotinas, triggers e eventos, lidos de um único snapshot consistente, sem bloquear tabelas."
           }
         },
         "ru": {
           "stringUnit": {
-            "state": "translated",
+            "state": "needs_review",
             "value": "%@ создаёт резервную копию всей базы данных: всех таблиц, представлений, процедур, функций, триггеров и событий, прочитанных из одного согласованного снимка без блокировки таблиц."
           }
         },
         "th": {
           "stringUnit": {
-            "state": "translated",
+            "state": "needs_review",
             "value": "%@ สำรองข้อมูลทั้งฐานข้อมูล ทั้งตาราง มุมมอง รูทีน ทริกเกอร์ และอีเวนต์ทั้งหมด โดยอ่านจากสแนปช็อตเดียวที่สอดคล้องกันโดยไม่ล็อกตาราง"
           }
         },
         "tr": {
           "stringUnit": {
-            "state": "translated",
+            "state": "needs_review",
             "value": "%@ veritabanının tamamını yedekler: tüm tabloları, view'ları, procedure ve function'ları, trigger'ları ve event'leri tabloları kilitlemeden tek bir tutarlı anlık görüntüden okur."
           }
         },
         "vi": {
           "stringUnit": {
-            "state": "translated",
+            "state": "needs_review",
             "value": "%@ sao lưu toàn bộ cơ sở dữ liệu: mọi bảng, khung nhìn, thủ tục, hàm, trình kích hoạt và sự kiện, được đọc từ cùng một ảnh chụp nhất quán mà không khóa bảng."
           }
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "translated",
+            "state": "needs_review",
             "value": "%@ 会备份整个数据库：所有表、视图、例程、触发器和事件，均从同一个一致的快照中读取，且不锁定表。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
-            "state": "translated",
+            "state": "needs_review",
             "value": "%@ 會備份整個資料庫：所有表格、檢視表、常式、觸發器和事件，皆從同一個一致的快照讀取，且不鎖定表格。"
           }
         }

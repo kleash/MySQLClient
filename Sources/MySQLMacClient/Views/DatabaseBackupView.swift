@@ -132,7 +132,7 @@ struct DatabaseBackupView: View {
     private var externalToolCard: some View {
         VStack(alignment: .leading, spacing: 8) {
             if let toolURL = viewModel.externalToolURL {
-                Text("\(toolURL.lastPathComponent) backs up the whole database: every table, view, routine, trigger and event, read from one consistent snapshot without locking tables.")
+                Text("\(toolURL.lastPathComponent) backs up the whole database: every table, view, routine, trigger and event, read without locking tables, from one consistent snapshot of its InnoDB tables.")
                     .foregroundStyle(theme.textPrimary)
                 Text(verbatim: toolURL.path)
                     .font(.system(size: 12, design: .monospaced))

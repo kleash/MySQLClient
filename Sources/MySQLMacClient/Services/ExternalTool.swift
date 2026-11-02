@@ -158,12 +158,13 @@ struct ExternalTool: Sendable {
         throw Failure(message: String(localized: "\(name) has no option to insist on an encrypted connection, so it could connect unencrypted. Use the built-in engine for this connection."))
     }
 
-    /// The whole database from one consistent snapshot, without locking a
-    /// table, with everything in it: routines, triggers and events, binary
-    /// values in hex, and the CREATE DATABASE and USE that bring it back
-    /// under its own name with its own character set. The file sets the
-    /// time zone it was read in and the SQL mode that keeps an explicit id
-    /// 0 itself. `--verbose` names each table as it's read.
+    /// The whole database, read without locking a table, from one
+    /// consistent snapshot of its InnoDB tables (other engines' are read as
+    /// they are), with everything in it: routines, triggers and events,
+    /// binary values in hex, and the CREATE DATABASE and USE that bring it
+    /// back under its own name with its own character set. The file sets
+    /// the time zone it was read in and the SQL mode that keeps an explicit
+    /// id 0 itself. `--verbose` names each table as it's read.
     func dumpArguments(database: String, connection: Connection) throws -> [String] {
         var arguments = try connectionArguments(connection)
         arguments += ["--single-transaction", "--skip-lock-tables", "--routines", "--triggers", "--events", "--hex-blob",
