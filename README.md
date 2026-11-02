@@ -162,9 +162,9 @@ Most tests talk to a real MySQL/MariaDB server, not a mock. The quickest way
 to get one is Docker:
 
 ```bash
-testenv/run-tests.sh                  # starts MariaDB 10.4 in Docker, runs every test
+testenv/run-tests.sh                  # starts MariaDB 10.4 and the SSH test servers in Docker, runs every test
 testenv/run-tests.sh --filter Backup  # extra arguments go to `swift test`
-docker compose -f testenv/docker-compose.yml down   # stop the server
+docker compose -f testenv/docker-compose.yml --profile ssh down   # stop the servers
 ```
 
 The server listens on `127.0.0.1:43306` only, keeps its data in memory, and
@@ -214,7 +214,8 @@ refused.
 SSH server (`CONNECT`, with a Basic or Digest login when it asks for one).
 Its password is kept in the Keychain along with the database password, and
 never given to ssh: the app carries ssh's connection through the proxy
-itself.
+itself. The proxy is asked for **SSH Host** as you typed it, so use the
+server's real name there, not a `Host` alias from your ssh config.
 
 Under `swift run`, ssh uses `~/.ssh` (its config, `known_hosts`, keys and
 ssh-agent) as it does in Terminal. The signed app is sandboxed, and ssh can
