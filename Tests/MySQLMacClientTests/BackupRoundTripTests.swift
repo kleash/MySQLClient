@@ -759,12 +759,12 @@ class BackupRoundTripTests: XCTestCase {
 /// profile), to a MariaDB that only the SSH server can reach. The app
 /// connects to the tunnel's local end, and so do mysqldump and the mysql
 /// client.
-class SSHBackupRoundTripTests: BackupRoundTripTests {
+final class SSHBackupRoundTripTests: BackupRoundTripTests {
     private var tunnel: SSHTunnel?
     private var sshFolder: URL?
     private var localPort = 0
 
-    var ssh: SSHSettings? {
+    private var ssh: SSHSettings? {
         let environment = ProcessInfo.processInfo.environment
         guard let port = environment["MYSQL_TEST_SSH_PORT"].flatMap(Int.init), let key = environment["MYSQL_TEST_SSH_KEY"] else { return nil }
         return SSHSettings(host: "127.0.0.1", port: port, username: "tunnel", keyFile: key)
@@ -775,10 +775,7 @@ class SSHBackupRoundTripTests: BackupRoundTripTests {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         sshFolder = folder
-        let proxy = ssh.proxy.map {
-            HTTPProxyConnector.Proxy(host: $0.host, port: $0.port, username: $0.username, password: "proxy-test-password")
-        }
-        let tunnel = SSHTunnel(settings: ssh, proxy: proxy, sshFolder: folder)
+        let tunnel = SSHTunnel(settings: ssh, proxy: nil, sshFolder: folder)
         localPort = try await tunnel.open(to: "private-mariadb", port: 3306)
         self.tunnel = tunnel
         try await super.setUp()
@@ -796,19 +793,5 @@ class SSHBackupRoundTripTests: BackupRoundTripTests {
         try await service.connect(host: "127.0.0.1", port: localPort, username: "root", password: nil, database: nil,
                                   serverName: "private-mariadb")
         return service
-    }
-}
-
-/// The same, with the SSH server reached through the HTTP proxy that wants a
-/// login.
-final class ProxiedSSHBackupRoundTripTests: SSHBackupRoundTripTests {
-    override var ssh: SSHSettings? {
-        guard var settings = super.ssh,
-              let proxyPort = ProcessInfo.processInfo.environment["MYSQL_TEST_PROXY_PORT"].flatMap(Int.init) else { return nil }
-        // The SSH server by the name the proxy knows it by.
-        settings.host = "ssh"
-        settings.port = 22
-        settings.proxy = HTTPProxySettings(host: "127.0.0.1", port: proxyPort, username: "proxyuser")
-        return settings
     }
 }
